@@ -684,7 +684,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     rm(mmat_nomissing)
     gc()
     isSparseGRMIdentity <- FALSE
-    if (useGRMtoFitNULL) {
+    if (!is.null(sampleListwithGeno)) {
       indicatorGenoSamplesWithPheno <- (sampleListwithGeno$IndexGeno %in% dataMerge_sort$IndexGeno)
 
       if (length(unique(dataMerge_sort$IIDgeno)) < length(unique(sampleListwithGeno$IIDgeno))) {
