@@ -96,8 +96,8 @@ def main():
             )
             .with_columns(
                 pl.lit(gene).alias("Gene"),
-                pl.col("p.value").alias("pval_main"),
-                pl.col("pval_ge").str.split(",").alias("dynamic_pvalues"),
+                pl.col("p.value").cast(pl.Float64).alias("pval_main"),
+                pl.col("pval_ge").cast(pl.String).str.split(",").alias("dynamic_pvalues"),
             )
             .with_columns(
                 [
@@ -111,7 +111,7 @@ def main():
             .select(
                 ["Gene", "MarkerID", "AF_Allele2", "pval_main"]
                 + contexts
-                + ["pval_ge_CCT"]
+                + [pl.col("pval_ge_CCT").cast(pl.Float64)]
             )
         )
         frames.append(frame)
