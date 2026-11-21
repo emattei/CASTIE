@@ -25,7 +25,10 @@ W    <- mu * vw                                          # count trait: mu.eta^2
 res  <- as.vector(m$residuals)
 tau  <- as.vector(m$theta); tau <- c(tau, 0, 0)[1:max(3, length(tau))]
 E    <- as.matrix(m$eMat)                                # standardized contexts (GxE and random slopes)
-slope <- if (length(tau) == 3) rep(tau[3], ncol(E)) else tau[-(1:2)]   # per-context slope taus (step 1 --perContextTau)
+k    <- ncol(E)
+slope <- if (length(tau) == 3) rep(tau[3], k) else tau[2 + 1:k]   # per-context slope taus (step 1 --perContextTau)
+Tm   <- diag(c(tau[2], slope), k + 1)
+if (length(tau) == 2 + 2 * k) Tm[1, -1] <- Tm[-1, 1] <- tau[2 + k + 1:k]  # intercept-slope covariances (--slopeCov)
 did  <- match(m$sampleID, unique(m$sampleID))
 stopifnot(m$traitType == "count", nrow(X) == length(mu))
 
@@ -33,7 +36,8 @@ blocks <- split(seq_along(did), did)
 SigmaInv <- function(V) {                                # dense per-donor inverse, no Woodbury
   V <- as.matrix(V); out <- V
   for (ix in blocks) {
-    Sd <- tau[1] * diag(1 / W[ix], length(ix)) + tau[2] + E[ix, , drop = FALSE] %*% (slope * t(E[ix, , drop = FALSE]))
+    Zd <- cbind(1, E[ix, , drop = FALSE])
+    Sd <- tau[1] * diag(1 / W[ix], length(ix)) + Zd %*% Tm %*% t(Zd)
     out[ix, ] <- solve(Sd, V[ix, , drop = FALSE])
   }
   out

@@ -2236,9 +2236,12 @@ void SAIGEClass::build_gxe_cache(const arma::mat & t_emat, unsigned int t_ne){
 	arma::vec tauvec = m_tauvec_mt.col(m_itrait);
 	C.tau0 = tauvec(0);
 	C.tau1 = (tauvec.n_elem > 1) ? tauvec(1) : 0.0;
-	// slope taus: one shared (length 3) or one per context (length 2 + t_ne, step 1 --perContextTau)
+	// slope taus: one shared (length 3) or one per context (length 2 + t_ne, step 1 --perContextTau),
+	// followed by one intercept-slope covariance per context (length 2 + 2 t_ne, step 1 --slopeCov)
 	unsigned int ns = (tauvec.n_elem > 2) ? tauvec.n_elem - 2 : 0;
-	C.tau2 = (ns > 0) ? tauvec.tail(ns).max() : 0.0;
+	bool hasCov = (t_ne > 0 && ns == 2 * t_ne);
+	if(hasCov) ns = t_ne;
+	C.tau2 = (ns > 0) ? tauvec.subvec(2, 1 + ns).max() : 0.0;
 
 	unsigned int N = m_n_gxe;
 	unsigned int nk = (C.tau2 > 0) ? t_ne : 0;
@@ -2247,6 +2250,15 @@ void SAIGEClass::build_gxe_cache(const arma::mat & t_emat, unsigned int t_ne){
 	C.Z.col(0).ones();
 	if(nk > 0){
 		C.Z.cols(1, nk) = t_emat.cols(m_itrait * t_ne, m_itrait * t_ne + t_ne - 1);
+	}
+	if(hasCov && nk > 0){
+		// Z T Z' = tau1' 11' + sum_j tau2_j (e_j + c_j)(e_j + c_j)', c_j = rho_j / tau2_j (as in step 1)
+		for(unsigned int j = 0; j < t_ne; j++){
+			double c = (tauvec(2 + j) > 0) ? tauvec(2 + t_ne + j) / tauvec(2 + j) : 0.0;
+			C.Z.col(1 + j) += c;
+			C.tau1 -= c * tauvec(2 + t_ne + j);
+		}
+		C.tau1 = std::max(C.tau1, 0.0);
 	}
 	C.wt = m_W_gxe_mt.col(m_itrait) / C.tau0;
 
