@@ -35,6 +35,7 @@ ACAT <- function(p) {
   p <- p[is.finite(p) & p > 0 & p < 1]
   if (!length(p)) return(NA_real_)
   t <- tan((0.5 - p) * pi)
+  if (mean(t) > 1e15) return(1 / (mean(t) * pi))
   pmin(pmax(0.5 - atan(mean(t)) / pi, 0), 1)
 }
 
