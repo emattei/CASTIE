@@ -2236,7 +2236,9 @@ void SAIGEClass::build_gxe_cache(const arma::mat & t_emat, unsigned int t_ne){
 	arma::vec tauvec = m_tauvec_mt.col(m_itrait);
 	C.tau0 = tauvec(0);
 	C.tau1 = (tauvec.n_elem > 1) ? tauvec(1) : 0.0;
-	C.tau2 = (tauvec.n_elem > 2) ? tauvec(2) : 0.0;
+	// slope taus: one shared (length 3) or one per context (length 2 + t_ne, step 1 --perContextTau)
+	unsigned int ns = (tauvec.n_elem > 2) ? tauvec.n_elem - 2 : 0;
+	C.tau2 = (ns > 0) ? tauvec.tail(ns).max() : 0.0;
 
 	unsigned int N = m_n_gxe;
 	unsigned int nk = (C.tau2 > 0) ? t_ne : 0;
@@ -2257,7 +2259,7 @@ void SAIGEClass::build_gxe_cache(const arma::mat & t_emat, unsigned int t_ne){
 	arma::vec tsq(C.q);
 	tsq(0) = std::sqrt(C.tau1);
 	for(unsigned int j = 1; j < C.q; j++){
-		tsq(j) = std::sqrt(C.tau2);
+		tsq(j) = std::sqrt(tauvec(ns == 1 ? 2 : 1 + j));
 	}
 	arma::mat Tsq = arma::diagmat(tsq);
 	arma::mat Iq = arma::eye<arma::mat>(C.q, C.q);

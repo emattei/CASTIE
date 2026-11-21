@@ -954,8 +954,10 @@ SPAGMMATtest <- function(bgenFile = "",
         om <- obj.model.List[[oml]]
         if (isTRUE(om$useGRMtoFitNULL)) {
           why_not <- "the null model was fit with a GRM (useGRMtoFitNULL=TRUE)"
-        } else if (length(om$theta) > 3) {
+        } else if (length(om$theta) > (if (isTRUE(om$perContextTau)) 2 + ncol(om$eMat) else 3)) {
           why_not <- "the null model has more than three variance components"
+        } else if (length(om$theta) != length(obj.model.List[[1]]$theta)) {
+          why_not <- "the null models have different numbers of variance components"
         } else if (!(om$traitType %in% c("count", "binary", "quantitative"))) {
           why_not <- paste0("traitType '", om$traitType, "' is not supported")
         } else if (is.null(om$useGRMtoFitNULL)) {
