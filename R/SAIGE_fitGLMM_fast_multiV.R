@@ -553,12 +553,12 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     print("HERERE2")
 
     if (length(covarColList) > 0) {
-      formula <- paste0(phenoCol, "~", paste0(covarColList,
+      formula <- paste0("`", phenoCol, "`~", paste0(covarColList,
         collapse = "+"
       ))
       hasCovariate <- TRUE
     } else {
-      formula <- paste0(phenoCol, "~ 1")
+      formula <- paste0("`", phenoCol, "`~ 1")
       hasCovariate <- FALSE
     }
 
@@ -587,7 +587,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (length(covarColList) > 0) {
       if (length(qCovarCol) > 0) {
         covarColList <- colnames(mmat)[2:(ncol(mmat) - coln)]
-        formula <- paste0(phenoCol, "~", paste0(covarColList, collapse = "+"))
+        formula <- paste0("`", phenoCol, "`~", paste0(covarColList, collapse = "+"))
         formula.null <- as.formula(formula)
       }
     }
@@ -749,7 +749,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       minCovariateCount
     )
     covarColList <- covarColList[!(covarColList %in% out_checksep)]
-    formula <- paste0(phenoCol, "~", paste0(covarColList,
+    formula <- paste0("`", phenoCol, "`~", paste0(covarColList,
       collapse = "+"
     ))
     formula.null <- as.formula(formula)
@@ -769,7 +769,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   if (isCovariateTransform & hasCovariate) {
     cat("qr transformation has been performed on covariates\n")
     out.transform <- Covariate_Transform(formula.null, data = dataMerge_sort)
-    formulaNewList <- c(phenoCol, " ~ ", out.transform$Param.transform$X_name[1])
+    formulaNewList <- c("`", phenoCol, "` ~ ", out.transform$Param.transform$X_name[1])
     if (length(out.transform$Param.transform$X_name) > 1) {
       for (i in c(2:length(out.transform$Param.transform$X_name))) {
         formulaNewList <- c(formulaNewList, "+", out.transform$Param.transform$X_name[i])
@@ -856,7 +856,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     covoffset <- mmat[, -1, drop = F] %*% modwitcov$coefficients[-1]
     print("isCovariateOffset=TRUE, so fixed effects coefficnets won't be estimated.")
     formula.new.withCov <- formula.new
-    formula_nocov <- paste0(phenoCol, "~ 1")
+    formula_nocov <- paste0("`", phenoCol, "`~ 1")
     formula.new <- as.formula(formula_nocov)
     hasCovariate <- FALSE
   } else {
