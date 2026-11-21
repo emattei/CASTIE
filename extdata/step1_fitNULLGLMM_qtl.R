@@ -62,7 +62,7 @@ option_list <- list(
   make_option("--memoryChunk", type="numeric", default=2,
    help="Optional. Size (Gb) for each memory chunk [default=2]"),
   make_option("--tauInit", type="character", default="0,0",
-   help="Optional. Initial values for tau. [default=0,0]"),
+   help="Optional. Initial values for tau. Dynamic models given fewer than 3 values use 1,0.1,0. [default=0,0]"),
   make_option("--LOCO", type="logical", default=TRUE,
     help="Whether to apply the leave-one-chromosome-out (LOCO) approach when fitting the null model using the full GRM [default=TRUE]."),
   make_option("--isLowMemLOCO", type="logical", default=FALSE,
@@ -680,6 +680,8 @@ print(tauInit)
 }else{
 tauInit <- convertoNumeric(strsplit(opt$tauInit, ",")[[1]], "tauInit")
 }
+# dynamic models have 3 variance components
+if (length(ecovars) > 0 && length(tauInit) < 3) tauInit <- c(1, 0.1, 0)
 
 
 # Tracking variables for the final report
