@@ -185,6 +185,10 @@ set_EMat <- function(t_EMat) {
     invisible(.Call('_CASTIE_set_EMat', PACKAGE = 'CASTIE', t_EMat))
 }
 
+set_perContextTau <- function(t_perContextTau) {
+    invisible(.Call('_CASTIE_set_perContextTau', PACKAGE = 'CASTIE', t_perContextTau))
+}
+
 getCrossprodMatAndKin <- function(bVec, LOCO) {
     .Call('_CASTIE_getCrossprodMatAndKin', PACKAGE = 'CASTIE', bVec, LOCO)
 }
@@ -780,3 +784,4 @@ mult_den_sp_to_sp <- function(a, b) {
 gen_sp <- function(a) {
     .Call('_CASTIE_gen_sp', PACKAGE = 'CASTIE', a)
 }
+

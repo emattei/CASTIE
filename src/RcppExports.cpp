@@ -649,6 +649,16 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// set_perContextTau
+void set_perContextTau(bool t_perContextTau);
+RcppExport SEXP _CASTIE_set_perContextTau(SEXP t_perContextTauSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< bool >::type t_perContextTau(t_perContextTauSEXP);
+    set_perContextTau(t_perContextTau);
+    return R_NilValue;
+END_RCPP
+}
 // getCrossprodMatAndKin
 arma::fvec getCrossprodMatAndKin(arma::fcolvec& bVec, bool LOCO);
 RcppExport SEXP _CASTIE_getCrossprodMatAndKin(SEXP bVecSEXP, SEXP LOCOSEXP) {
@@ -2684,6 +2694,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CASTIE_set_T_longl_mat", (DL_FUNC) &_CASTIE_set_T_longl_mat, 2},
     {"_CASTIE_set_T_longl_mat_SAIGEtest", (DL_FUNC) &_CASTIE_set_T_longl_mat_SAIGEtest, 2},
     {"_CASTIE_set_EMat", (DL_FUNC) &_CASTIE_set_EMat, 1},
+    {"_CASTIE_set_perContextTau", (DL_FUNC) &_CASTIE_set_perContextTau, 1},
     {"_CASTIE_getCrossprodMatAndKin", (DL_FUNC) &_CASTIE_getCrossprodMatAndKin, 2},
     {"_CASTIE_getCrossprod_multiV", (DL_FUNC) &_CASTIE_getCrossprod_multiV, 4},
     {"_CASTIE_getDiagOfSigma_multiV", (DL_FUNC) &_CASTIE_getDiagOfSigma_multiV, 3},

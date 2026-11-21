@@ -47,6 +47,8 @@
 #' @param isCovariateOffset logical. Whether to estimate fixed effect coeffciets. By default, FALSE.
 #' @param isStoreSigma logical. Whether to store sigma matrix. By default, FALSE. If number of individuals is greater than 10,000, this option may use large memory
 #' @param isShrinkModelOutput logical. remove unnecessary objects for step2 from the model output. By default, FALSE.
+#' @param perContextTau logical. Fit one random-slope variance per column of eCovarCol, not one shared value.
+#'   By default, FALSE.
 #' @return a file ended with .rda that contains the glmm model information, a file ended with .varianceRatio.txt that contains the variance ratio values, and a file ended with #markers.SPAOut.txt that contains the SPAGMMAT tests results for the markers used for estimating the variance ratio.
 #' @export
 fitNULLGLMM_multiV <- function(plinkFile = "",
@@ -116,6 +118,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
                                isStoreSigma = FALSE,
                                isShrinkModelOutput = FALSE,
                                smwCacheMemLimitMB = NULL,
+                               perContextTau = FALSE,
                                verbose = FALSE) {
   ## set up output files
   modelOut <- paste0(outputPrefix, ".rda")
@@ -941,6 +944,19 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   }
 
 
+  if (perContextTau) {
+    if (is.null(eMat) || ncol(eMat) >= 100 || !any(duplicated(dataMerge_sort$IID)) || useGRMtoFitNULL ||
+      numofV > 0 || longlCol != "" || traitType == "count_nb") {
+      stop(
+        "perContextTau=TRUE needs 1-99 dynamic covariates, repeated cells per donor, useGRMtoFitNULL=FALSE, ",
+        "no Vmat files, no longlCol and traitType other than count_nb\n"
+      )
+    }
+    num_Kmat <- 2 + ncol(eMat)
+    # tau = (tau0, tau1, one slope tau per context); also covers callers that pass a shorter tauInit
+    if (length(tauInit) != num_Kmat) tauInit <- c(1, 0.1, rep(0, ncol(eMat)))
+  }
+  set_perContextTau(perContextTau)
   k <- num_Kmat
 
 
@@ -1285,6 +1301,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       eMatcolNames <- checkColList[checkColList %in% eCovarCol]
       eMatIsSample <- eMatcolNames %in% sampleCovarCol
       modglmm$eMatcolNames <- eMatcolNames
+      modglmm$perContextTau <- perContextTau
       modglmm$eMatIsSample <- eMatIsSample
 
 
@@ -1346,7 +1363,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       ## one setup + n_donors cheap applies. Falls back to gettI_Sigma_I_multiV
       ## if preconditions don't hold.
       pp_smw_cached <- FALSE
-      if (!is.null(modglmm$eMat) && length(tauVecNew) >= 3 && tauVecNew[3] != 0) {
+      if (!is.null(modglmm$eMat) && length(tauVecNew) >= 3 && any(tauVecNew[-(1:2)] != 0)) {
         .pp_dec <- .smw_cache_decision(modglmm$eMat, "post-processing")
         if (.pp_dec$allowed) {
           pp_smw_cached <- isTRUE(prepareSigmaInvSMW_multiV(W, tauVecNew))
@@ -1552,6 +1569,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (is.null(modglmm$LOCO)) {
       modglmm$LOCO <- FALSE
     }
+    set_perContextTau(isTRUE(modglmm$perContextTau))
 
     # need check
     subSampleInGeno <- dataMerge_sort$IndexGeno
@@ -1741,7 +1759,7 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
   ## Falls back to getSigma_X_multiV / getSigma_G_multiV (which still route to
   ## their own Case 2 / 3) if preconditions don't hold.
   smw_cached <- FALSE
-  if (!is.null(obj.glmm.null$eMat) && length(tauVecNew) >= 3 && tauVecNew[3] != 0) {
+  if (!is.null(obj.glmm.null$eMat) && length(tauVecNew) >= 3 && any(tauVecNew[-(1:2)] != 0)) {
     .vr_N <- nrow(obj.glmm.null$eMat)
     .vr_k <- ncol(obj.glmm.null$eMat)
     .vr_D <- length(unique(obj.glmm.null$sampleID))
