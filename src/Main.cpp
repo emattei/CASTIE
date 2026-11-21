@@ -4579,6 +4579,13 @@ void projectSlopeCov(arma::fvec & tauVec){
 	if(s > lim) rho *= (lim > 0) ? std::sqrt(lim / s) : 0.0f;
 	tauVec.subvec(2 + k, 1 + 2 * k) = rho;
 }
+// sum_j rho_j^2 / tau2_j - tau1 over tau2_j > 0; > 0 means T is not positive semi-definite
+float slopeCovExcess(arma::fvec & tauVec){
+	arma::fvec t2 = slopeTauVec(tauVec);
+	arma::fvec rho = slopeCovVec(tauVec);
+	arma::uvec pos = arma::find(t2 > 0);
+	return arma::accu(arma::square(rho.elem(pos)) / t2.elem(pos)) - tauVec(1);
+}
 
 
 
@@ -9299,6 +9306,8 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         Function warning("warning");
 
         unsigned int k1 = g_num_Kmat;
+        // rho_j joins the Newton step only once its slope variance is > 0
+        if(g_slopeCov) for(unsigned int j = 0; j < g_EMat.n_cols; j++) if(tauVec(2 + j) == 0) fixtauVec(2 + g_EMat.n_cols + j) = 1;
 
         int q2 = arma::sum(fixtauVec==0);
         arma::uvec idxtau = arma::find(fixtauVec==0);
@@ -9342,17 +9351,18 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         arma::uvec covarianceidxVec1, covarianceidxVec_sub1, covarianceidxVec2, covarianceidxVec_sub2,covarianceidxVec3, covarianceidxVec_sub3, zeroindVec1;
 
         if(g_slopeCov){
-                // bound only the variances; the covariances are signed and projected so T stays PSD
+                // halve the whole Newton step until the variances are >= 0 and T is PSD; the covariances are signed
                 unsigned int nv = k1 - g_EMat.n_cols;
                 arma::fvec v0 = tau0.head(nv);
-                arma::fvec v = tauVec.head(nv);
-                v.elem( arma::find(v < tol && v0 < tol) ).zeros();
+                arma::fvec v;
                 float step = 1.0;
-                while ( arma::any(v < 0.0) ){
-                        step = step*0.5;
+                for(int h = 0; h <= 20; h++){
                         tauVec = tau0 + step*Dtau_k1;
                         v = tauVec.head(nv);
                         v.elem( arma::find(v < tol && v0 < tol) ).zeros();
+                        tauVec.head(nv) = v;
+                        if(!arma::any(v < 0.0) && slopeCovExcess(tauVec) <= 0) break;
+                        step = step*0.5;
                 }
                 v.elem( arma::find(v < tol) ).zeros();
                 tauVec.head(nv) = v;
