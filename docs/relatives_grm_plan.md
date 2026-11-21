@@ -57,6 +57,20 @@ blocks instead, with a small dense solve per family.
      README.
 
    If main and GxC are both OK, document "prune or ignore" and stop here.
+
+   **Result (2026-11-20).** Relatives inflate the current recipe. Type-I
+   ratio at α = 0.01 (observed / nominal, 95% peak-bootstrap interval), 200
+   null peaks each:
+
+   | Test | Unrelated (150 donors) | 75 sib pairs |
+   |---|---|---|
+   | main | 0.93 [0.87–0.98] | 1.28 [1.19–1.38], up to 1.83 in the densest tier |
+   | GxC ctx1 | 1.09 [1.01–1.17] | 1.41 [1.32–1.51] |
+   | GxC stim | 0.36 [0.31–0.42] | 0.44 [0.38–0.50] |
+
+   λ for main goes from 1.00 to 1.10. The GxC ctx1 inflation comes from the
+   sib-correlated slopes, so kinship-structured slopes are probably needed,
+   not optional.
 1. **`createSparseGRM.R` fix.** Check on the simulated families that the sib
    entries are about 0.5 and the rest are about 0.
 2. **Family index.** From the sparse GRM sample IDs, map donors to families.
