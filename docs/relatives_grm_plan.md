@@ -39,9 +39,9 @@ Sigma = τ0 W⁻¹ + Z (τ1 I + τg K) Zᵀ + context slopes (iid per donor, as 
 - The iid term τ1 stays: it carries non-genetic donor effects.
 - τg is identified only through related pairs. With none above the cutoff, `K`
   is the identity and the model must reduce to today's, with τg not fitted.
-- Version 1 keeps the slopes iid. Kinship-structured slopes (heritable context
-  response) come later, and only if the sib simulation shows that the GxC
-  tests need them.
+- Slopes: iid or kinship-structured is unresolved. The sib simulation made
+  both the intercept and the slopes family-correlated. Run an intercept-only sib
+  case before deciding; see step 0.
 
 The key property is that Sigma stays block-diagonal by **family**, with small
 blocks. Every place that loops over donor blocks today can loop over family
@@ -68,9 +68,15 @@ blocks instead, with a small dense solve per family.
    | GxC ctx1 | 1.09 [1.01–1.17] | 1.41 [1.32–1.51] |
    | GxC stim | 0.36 [0.31–0.42] | 0.44 [0.38–0.50] |
 
-   λ for main goes from 1.00 to 1.10. The GxC ctx1 inflation comes from the
-   sib-correlated slopes, so kinship-structured slopes are probably needed,
-   not optional.
+   λ for main goes from 1.00 to 1.10.
+
+   Hypothesis, not yet tested: the extra GxC ctx1 inflation comes from the
+   sib-correlated slopes. If so, kinship-structured slopes are needed. Test
+   it with an intercept-only sib case.
+
+   Separate issue: the unrelated baseline of 1.09 for GxC ctx1 comes from the
+   shared slope variance across standardised contexts (see the calibration
+   README).
 1. **`createSparseGRM.R` fix.** Check on the simulated families that the sib
    entries are about 0.5 and the rest are about 0.
 2. **Family index.** From the sparse GRM sample IDs, map donors to families.
