@@ -189,6 +189,10 @@ set_perContextTau <- function(t_perContextTau) {
     invisible(.Call('_CASTIE_set_perContextTau', PACKAGE = 'CASTIE', t_perContextTau))
 }
 
+set_slopeCov <- function(t_slopeCov) {
+    invisible(.Call('_CASTIE_set_slopeCov', PACKAGE = 'CASTIE', t_slopeCov))
+}
+
 getCrossprodMatAndKin <- function(bVec, LOCO) {
     .Call('_CASTIE_getCrossprodMatAndKin', PACKAGE = 'CASTIE', bVec, LOCO)
 }

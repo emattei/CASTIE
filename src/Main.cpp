@@ -72,6 +72,7 @@ arma::uvec g_covarianceidxMat_col3;
 arma::uvec g_covarianceidxMat_notcol1;
 arma::fmat g_EMat;
 bool g_perContextTau = false;  // tau = (tau0, tau1, one slope tau per E column)
+bool g_slopeCov = false;  // with g_perContextTau, tau also has one intercept-slope covariance per E column
 arma::fvec  g_EEt_eigenvalVec;
 arma::fvec g_EEt_diagVec;
 arma::fmat g_EEt_eigenvecMat;
@@ -4536,6 +4537,49 @@ arma::fvec eKernel(arma::fvec & bVec, unsigned int j){
 	return e % getprodImatImattbVec(eb);
 }
 
+// [[Rcpp::export]]
+void set_slopeCov(bool t_slopeCov){
+	g_slopeCov = t_slopeCov;
+}
+// Intercept-slope covariance rho_j of each E column: tau(2+k..1+2k) with slopeCov, else 0
+arma::fvec slopeCovVec(arma::fvec & tauVec){
+	unsigned int k = g_EMat.n_cols;
+	if(g_slopeCov) return tauVec.subvec(2 + k, 1 + 2 * k);
+	return arma::zeros<arma::fvec>(k);
+}
+// Z T Z' = tau1' 11' + sum_j tau2_j (e_j + c_j)(e_j + c_j)' with c_j = rho_j / tau2_j, tau1' = tau1 - sum_j rho_j c_j,
+// so the diagonal-T solvers work on shifted E columns
+arma::fvec slopeShiftVec(arma::fvec & tauVec){
+	arma::fvec t2 = slopeTauVec(tauVec);
+	arma::fvec c = slopeCovVec(tauVec);
+	for(unsigned int j = 0; j < c.n_elem; j++) c(j) = (t2(j) > 0) ? c(j) / t2(j) : 0;
+	return c;
+}
+float interceptTauEff(arma::fvec & tauVec){
+	if(!g_slopeCov) return tauVec(1);
+	arma::fvec c = slopeShiftVec(tauVec);
+	return std::max(0.0f, tauVec(1) - arma::dot(slopeCovVec(tauVec), c));
+}
+// Kernel of rho_j: e_j % (I I^T b) + I I^T (e_j % b)
+arma::fvec cKernel(arma::fvec & bVec, unsigned int j){
+	arma::fvec e = g_EMat.col(j);
+	arma::fvec eb = e % bVec;
+	return e % getprodImatImattbVec(bVec) + getprodImatImattbVec(eb);
+}
+// Keep T = [tau1, rho'; rho, diag(tau2)] positive semi-definite: rho_j = 0 where tau2_j = 0,
+// then shrink rho if sum_j rho_j^2 / tau2_j exceeds tau1
+void projectSlopeCov(arma::fvec & tauVec){
+	unsigned int k = g_EMat.n_cols;
+	arma::fvec t2 = slopeTauVec(tauVec);
+	arma::fvec rho = slopeCovVec(tauVec);
+	rho.elem(arma::find(t2 <= 0)).zeros();
+	arma::uvec pos = arma::find(t2 > 0);
+	float s = arma::accu(arma::square(rho.elem(pos)) / t2.elem(pos));
+	float lim = 0.999f * tauVec(1);
+	if(s > lim) rho *= (lim > 0) ? std::sqrt(lim / s) : 0.0f;
+	tauVec.subvec(2 + k, 1 + 2 * k) = rho;
+}
+
 
 
 // [[Rcpp::export]]
@@ -5092,8 +5136,9 @@ arma::fvec getPCG1ofSigmaAndVector_multiV(arma::fvec& wVec,  arma::fvec& tauVec,
                 // Process each individual separately to minimize memory usage
                 auto n_individuals = g_I_start_indices.n_elem - 1;
                 float inv_tau0 = 1.0f / tauVec(0);
-                float tau1 = tauVec(1);
+                float tau1 = interceptTauEff(tauVec);
                 arma::frowvec sqrt_tau2 = arma::sqrt(slopeTauVec(tauVec)).t();
+                arma::frowvec shift = slopeShiftVec(tauVec).t();
 
 #ifdef _OPENMP
                 omp_set_num_threads(g_omp_num_threads);
@@ -5130,6 +5175,7 @@ arma::fvec getPCG1ofSigmaAndVector_multiV(arma::fvec& wVec,  arma::fvec& tauVec,
                     // Step 2: Apply Woodbury correction for E matrix
                     // U = V = sqrt(τ[2]) * E_ind^T  (cells_in_individual × k)
                     arma::fmat U_ind = E_ind.t();
+                    if (g_slopeCov) U_ind.each_row() += shift;
                     U_ind.each_row() %= sqrt_tau2;
 
                     // Compute A_ind^(-1) * U_ind
@@ -5399,8 +5445,9 @@ bool prepareSigmaInvSMW_multiV(arma::fvec& wVec, arma::fvec& tauVec) {
     g_smwCache_indCache.resize(n_individuals);
 
     float inv_tau0  = 1.0f / tauVec(0);
-    float tau1      = tauVec(1);
+    float tau1      = interceptTauEff(tauVec);
     arma::frowvec sqrt_tau2 = arma::sqrt(slopeTauVec(tauVec)).t();
+    arma::frowvec shift = slopeShiftVec(tauVec).t();
 
 #ifdef _OPENMP
     omp_set_num_threads(g_omp_num_threads);
@@ -5418,6 +5465,7 @@ bool prepareSigmaInvSMW_multiV(arma::fvec& wVec, arma::fvec& tauVec) {
         // E_ind is k x cells_in_individual; U_ind is cells_in_individual x k.
         arma::fmat E_ind = g_EMat.rows(start, end-1).t();
         C.U_ind       = E_ind.t();
+        if (g_slopeCov) C.U_ind.each_row() += shift;
         C.U_ind.each_row() %= sqrt_tau2;
 
         C.A_inv_U_ind.set_size(cells_in_individual, k);
@@ -8662,6 +8710,7 @@ arma::fcolvec getCrossprod_multiV_eMat(arma::fcolvec& bVec, arma::fvec& wVec, ar
                 }else if(g_perContextTau){
                   for(unsigned int j = 0; j < g_EMat.n_cols; j++){
                     crossProdVec = crossProdVec + tauVec(tau_ind + j)*eKernel(bVec, j);
+                    if(g_slopeCov) crossProdVec = crossProdVec + tauVec(tau_ind + g_EMat.n_cols + j)*cKernel(bVec, j);
                   }
                   return(crossProdVec);
                 }else{
@@ -9105,6 +9154,7 @@ arma::fvec getDiagOfSigma_multiV_eMat(arma::fvec& wVec, arma::fvec& tauVec, bool
 
                if(g_perContextTau){
                  diagVec = diagVec + arma::square(g_EMat) * slopeTauVec(tauVec);
+                 if(g_slopeCov) diagVec = diagVec + 2.0f * (g_EMat * slopeCovVec(tauVec));
                }else{
                  diagVec = diagVec + tauVec(tauind) * g_REEt_diagVec;
                }
@@ -9291,7 +9341,26 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         arma::ivec fixrhoidx0, fixrhoidx, tauupdateidx;
         arma::uvec covarianceidxVec1, covarianceidxVec_sub1, covarianceidxVec2, covarianceidxVec_sub2,covarianceidxVec3, covarianceidxVec_sub3, zeroindVec1;
 
-        if(g_covarianceidxMat.n_rows == 0){
+        if(g_slopeCov){
+                // bound only the variances; the covariances are signed and projected so T stays PSD
+                unsigned int nv = k1 - g_EMat.n_cols;
+                arma::fvec v0 = tau0.head(nv);
+                arma::fvec v = tauVec.head(nv);
+                v.elem( arma::find(v < tol && v0 < tol) ).zeros();
+                float step = 1.0;
+                while ( arma::any(v < 0.0) ){
+                        step = step*0.5;
+                        tauVec = tau0 + step*Dtau_k1;
+                        v = tauVec.head(nv);
+                        v.elem( arma::find(v < tol && v0 < tol) ).zeros();
+                }
+                v.elem( arma::find(v < tol) ).zeros();
+                tauVec.head(nv) = v;
+                arma::fvec rho = slopeCovVec(tauVec);
+                rho.elem( arma::find(arma::abs(rho) < tol) ).zeros();
+                tauVec.tail(g_EMat.n_cols) = rho;
+                projectSlopeCov(tauVec);
+        }else if(g_covarianceidxMat.n_rows == 0){
                 tauVec.elem( arma::find(tauVec < tol && tau0 < tol) ).zeros();
                 float step = 1.0;
                 while ( arma::any(tauVec < 0.0) ){
@@ -9587,7 +9656,8 @@ int nrun, int maxiterPCG, float tolPCG, float traceCVcutoff, bool LOCO){
                              if(g_isGRM){
                                  APY = getCrossprodMatAndKin_eMat_Imat(PY1, LOCO);
                              }else if(g_perContextTau){
-                                APY = eKernel(PY1, i - 2);
+                                unsigned int j = i - 2, k = g_EMat.n_cols;
+                                APY = (j < k) ? eKernel(PY1, j) : cKernel(PY1, j - k);
                              }else{
                                 APY = getCrossprodMatAndI_eMat_Imat(PY1, LOCO);
                              }
@@ -9791,7 +9861,8 @@ arma::fvec GetTrace_multiV_eMat(arma::fmat Sigma_iX, arma::fmat& Xmat, arma::fve
 				if(g_perContextTau){
                                         for(unsigned int c = 2; c < k1; c++){
                                                 if(fixtauVec(c) == 0){
-                                                        temp_vec_double = eKernel(uVec, c - 2);
+                                                        unsigned int j = c - 2, k = g_EMat.n_cols;
+                                                        temp_vec_double = (j < k) ? eKernel(uVec, j) : cKernel(uVec, j - k);
                                                         Au_mat.col(c) = temp_vec_double;
                                                         temp_mat(i,c) = dot(temp_vec_double, Pu);
                                                 }
@@ -9824,6 +9895,8 @@ arma::fvec GetTrace_multiV_eMat(arma::fmat Sigma_iX, arma::fmat& Xmat, arma::fve
                 for(int k=0; k<q2; k++){
                         temp_vec = temp_mat_update.col(k);
                         traceCV(k) = calCV(temp_vec);
+                        // a covariance trace can be ~0, so its CV never settles
+                        if(g_slopeCov && idxtau(k) >= 2 + g_EMat.n_cols) traceCV(k) = 0;
                 }
 
                 if(g_covarianceidxMat.n_cols > 0){

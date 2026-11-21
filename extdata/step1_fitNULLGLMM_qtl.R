@@ -63,6 +63,8 @@ option_list <- list(
    help="Optional. Size (Gb) for each memory chunk [default=2]"),
   make_option("--perContextTau", type="logical", default=FALSE,
    help="Optional. Fit one random-slope variance per dynamic covariate. Needs useGRMtoFitNULL=FALSE [default=FALSE]"),
+  make_option("--slopeCov", type="logical", default=FALSE,
+   help="Optional. With --perContextTau, also fit an intercept-slope covariance per dynamic covariate [default=FALSE]"),
   make_option("--tauInit", type="character", default="0,0",
    help="Optional. Initial values for tau. Dynamic models given fewer than 3 values use 1,0.1,0. [default=0,0]"),
   make_option("--LOCO", type="logical", default=TRUE,
@@ -440,7 +442,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
       verbose=opt$verbose,
       eCovarCol=ecovars,
-      perContextTau=opt$perContextTau
+      perContextTau=opt$perContextTau, slopeCov=opt$slopeCov
         )
 
 
@@ -526,7 +528,7 @@ if(!opt$isCovariateOffset){
               smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
               verbose=opt$verbose,
               eCovarCol=ecovars,
-              perContextTau=opt$perContextTau
+              perContextTau=opt$perContextTau, slopeCov=opt$slopeCov
           )
           TRUE
         }, error = function(e) {
@@ -623,7 +625,7 @@ if(!opt$isCovariateOffset){
               smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
               verbose=opt$verbose,
               eCovarCol=ecovars,
-              perContextTau=opt$perContextTau
+              perContextTau=opt$perContextTau, slopeCov=opt$slopeCov
           )
           my_env = new.env()
           load(paste0(outputprefixsubset, ".offset.rda"), envir = my_env)
@@ -763,7 +765,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
       verbose=opt$verbose,
       eCovarCol=ecovars,
-      perContextTau=opt$perContextTau
+      perContextTau=opt$perContextTau, slopeCov=opt$slopeCov
 	)
 
 }, error = function(e) {
@@ -829,6 +831,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
       offsetCol=opt$offsetCol, varWeightsCol=opt$varWeightsCol,
       sampleCovarCol=scovars, isStoreSigma=opt$isStoreSigma,
       isShrinkModelOutput=opt$isShrinkModelOutput, eCovarCol=ecovars, perContextTau=opt$perContextTau,
+      slopeCov=opt$slopeCov,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB, verbose=opt$verbose
     ),
     error = function(e) { cat("Fit failed:", e$message, "\n"); NULL }
