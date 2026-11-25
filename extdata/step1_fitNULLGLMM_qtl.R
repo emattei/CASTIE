@@ -1030,7 +1030,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
     m$use_sandwich <- rep(TRUE, length(m$use_sandwich))
     if (!is.null(m$eMatIsSample)) m$use_sandwich[m$eMatIsSample] <- FALSE
     modglmm <- m
-    save(modglmm, file=model_file)
+    save(modglmm, file=model_file, compress=FALSE)
     use_sandwich <- m$use_sandwich  # keep local var in sync with what was saved
   }
 

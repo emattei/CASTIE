@@ -1454,7 +1454,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       modglmm$chromosomeStartIndexVec <- NULL
       modglmm$chromosomeEndIndexVec <- NULL
       modelOut <- paste(c(outputPrefix, "_noLOCO.rda"), collapse = "")
-      save(modglmm, file = modelOut)
+      save(modglmm, file = modelOut, compress = FALSE)
       modglmm$LOCO <- TRUE
       modglmm$Y <- NULL
       eta0 <- modglmm$linear.predictors
@@ -1522,7 +1522,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
               modglmm$LOCOResult[[j1]] <- list(NULL)
             }
           }
-          save(modglmm, file = modelOutbychr)
+          save(modglmm, file = modelOutbychr, compress = FALSE)
           modglmm$LOCOResult[[j]] <- list(NULL)
           gc()
         } else {
@@ -1540,7 +1540,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       # modglmm$T_longl_mat = I_mat * (dataMerge_sort$longlVar)
       modglmm$T_longl_vec <- dataMerge_sort$longlVar
       .t_pp_save <- proc.time()
-      save(modglmm, file = modelOut)
+      save(modglmm, file = modelOut, compress = FALSE)
       if (verbose) cat(sprintf("[TIMING:PP] save modglmm: %.2fs\n", (proc.time() - .t_pp_save)[3]))
     }
 
@@ -1681,7 +1681,8 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     modglmm$use_sandwich <- use_sandwich
     modglmm$useGRMtoFitNULL <- useGRMtoFitNULL
   }
-  save(modglmm, file = modelOut)
+  # uncompressed: gzip of ~60 MB of doubles costs ~5 s per save (and ~1 s per load) for ~20% smaller files
+  save(modglmm, file = modelOut, compress = FALSE)
 
   cat(sprintf("[TIMING] Variance ratio estimation + final save: %.1fs\n", (proc.time() - .t_varratio)[3]))
   .report_mem("after Variance ratio estimation")
