@@ -1645,6 +1645,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     modglmm$linear.predictors <- NULL
     modglmm$coefficients <- NULL
     modglmm$cov <- NULL
+    modglmm$obj.noK$XVX_inv_XV <- NULL # built by ScoreTest_NULL_Model, read nowhere
     if (sum(duplicated(modglmm$sampleID)) > 0) {
       modglmm$obj.noK$Sigma_iXXSigma_iX <- matrix(1)
       modglmm$X <- NULL
@@ -1653,7 +1654,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         modglmm$obj.noK$XVX <- NULL
         modglmm$obj.noK$XXVX_inv <- NULL
         modglmm$obj.noK$XVX_inv <- NULL
-        modglmm$obj.noK$XVX_inv_XV <- NULL
       }
     }
   } else {
