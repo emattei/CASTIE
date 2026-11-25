@@ -10,6 +10,7 @@
 #' @param eCovarCol vector of characters. Covariates of environmental factors/cell context to be used in the null model. All covariates listed in eCovarCol must be also in covarColList,  e,g c("cellType").
 #' @param sampleIDColinphenoFile character. Column name for the sample IDs in the phenotype file e.g. "IID".
 #' @param tol numeric. The tolerance for fitting the null model to converge. By default, 0.02.
+#' @param tauZeroCutoff numeric. Variance components below this are set to 0 while fitting. NA (default) uses tol, the original behaviour, which ties the cutoff to the convergence tolerance. Not used by traitType = "count_nb".
 #' @param maxiter integer. The maximum number of iterations used to fit the null GLMMM. By default, 20.
 #' @param tolPCG numeric. The tolerance for PCG to converge. By default, 1e-5.
 #' @param maxiterPCG integer. The maximum number of iterations for PCG. By default, 500.
@@ -69,6 +70,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
                                longlCol = "",
                                sampleIDColinphenoFile = "",
                                tol = 0.02,
+                               tauZeroCutoff = NA,
                                maxiter = 20,
                                tolPCG = 1e-5,
                                maxiterPCG = 500,
@@ -1179,12 +1181,13 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     set_isSparseGRM(useSparseGRMtoFitNULL)
     set_useGRMtoFitNULL(useGRMtoFitNULL)
 
+    if (is.na(tauZeroCutoff)) tauZeroCutoff <- tol  # original behaviour: tol is both the convergence tolerance and the zeroing cutoff
     if (traitType != "count_nb") {
       if (length(eCovarCol) == 0) {
         system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
           tau = tau, fixtau = fixtau, maxiter = maxiter,
-          tol = tol, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
+          tol = tol, tauZeroCutoff = tauZeroCutoff, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
           maxiterPCG = maxiterPCG, subPheno = dataMerge_sort, indicatorGenoSamplesWithPheno = indicatorGenoSamplesWithPheno,
           obj.noK = obj.noK, out.transform = out.transform,
           tauInit = tauInit, memoryChunk = memoryChunk,
@@ -1202,7 +1205,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV_eMat(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
           tau = tau, fixtau = fixtau, maxiter = maxiter,
-          tol = tol, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
+          tol = tol, tauZeroCutoff = tauZeroCutoff, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
           maxiterPCG = maxiterPCG, subPheno = dataMerge_sort, indicatorGenoSamplesWithPheno = indicatorGenoSamplesWithPheno,
           obj.noK = obj.noK, out.transform = out.transform,
           tauInit = tauInit, memoryChunk = memoryChunk,
@@ -2402,7 +2405,7 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
 
 
 # Fits the null glmm
-glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
+glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, tauZeroCutoff = tol, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
   # Fits the null generalized linear mixed model for a poisson, binomial, and gaussian
   # Args:
   #  genofile: string. Plink file for the M1 markers to be used to construct the genetic relationship matrix
@@ -2636,7 +2639,7 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
     # }
 
 
-    fit <- fitglmmaiRPCG_multiV(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tol, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
+    fit <- fitglmmaiRPCG_multiV(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tauZeroCutoff, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
 
     t_end_fitglmmaiRPCG <- proc.time()
     cat("t_end_fitglmmaiRPCG - t_begin_fitglmmaiRPCG\n")
@@ -2827,7 +2830,7 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
 
 
 # Fits the null glmm
-glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
+glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, tauZeroCutoff = tol, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
   # Fits the null generalized linear mixed model for a poisson, binomial, and gaussian
   # Args:
   #  genofile: string. Plink file for the M1 markers to be used to construct the genetic relationship matrix
@@ -3062,7 +3065,7 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
     # }
 
 
-    fit <- fitglmmaiRPCG_multiV_eMat(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tol, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
+    fit <- fitglmmaiRPCG_multiV_eMat(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tauZeroCutoff, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
 
     t_end_fitglmmaiRPCG <- proc.time()
     cat("t_end_fitglmmaiRPCG - t_begin_fitglmmaiRPCG\n")
