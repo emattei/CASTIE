@@ -25,7 +25,7 @@ castie_save_model <- function(modglmm, file) {
 }
 
 #' The `modglmm` stored in an .rda file: the kept object when it is what castie_save_model() last wrote to that
-#' file (same path, size and modification time), otherwise read with load().
+#' file (same path, size and modification time), otherwise read with load(). Stops on a path removed in memory mode.
 #' @param file the .rda path.
 castie_load_model <- function(file) {
   if (.in_memory() && isFALSE(.model_store[[.store_key(file)]])) stop("null model ", file, " was removed")
@@ -66,11 +66,12 @@ castie_rename_model <- function(from, to) {
   }
 }
 
-#' Remove the null model at `file`, or the empty file reserved there.
+#' Remove the null model at `file`, or the empty file reserved there. In memory mode the path is marked removed
+#' until castie_clear_models(), so a stale file left there is not read.
 #' @param file the .rda path.
 castie_remove_model <- function(file) {
   if (!.in_memory()) return(if (file.exists(file)) file.remove(file))
-  assign(.store_key(file), FALSE, envir = .model_store) # so a stale file left at this path is not read
+  assign(.store_key(file), FALSE, envir = .model_store)
 }
 
 #' Forget every null model kept in memory (CASTIE.keepModels = FALSE): step12_batch_qtl.R calls it at each new feature.
