@@ -66,7 +66,7 @@ Where a typical converged peak's time goes (`[TIMING]` lines, 67 s of step 1 plu
 
 ## Plan
 
-### 1. Separate the zeroing cutoff from `tol` (in progress)
+### 1. Separate the zeroing cutoff from `tol` (merged)
 - New option `--tauZeroCutoff` (branch `feat/tau-zero-cutoff`, `8beb378`). Variance components below it
   are set to 0; NA (the default) uses `tol`, so existing runs are unchanged.
 - Only `fitNULLGLMM_multiV` and the two Poisson/binomial loops (`glmmkin.ai_PCG_Rcpp_multiV`,
@@ -82,7 +82,7 @@ Where a typical converged peak's time goes (`[TIMING]` lines, 67 s of step 1 plu
 - **Expected:** removes the `maxiter` tail (33% of step 1 time on chr22) and the slow-converging
   fits (e.g. 242 iterations).
 
-### 2. Exact traces for donor-block kernels (next)
+### 2. Exact traces for donor-block kernels (merged)
 - Here `K_k = Z_k Z_k^T`, with `Z_1 = I_longl` (donor intercept) and `Z_{1+c} = diag(e_c) I_longl`
   (`eKernel`), so Sigma = diag(tau_0 / w) + sum_k tau_k K_k is block diagonal over donors.
 - For donor d, let `U_d = [1, e_1, ..., e_C]` on its cells, `G = diag(tau_1, ..., tau_{1+C})` and
@@ -102,7 +102,7 @@ Where a typical converged peak's time goes (`[TIMING]` lines, 67 s of step 1 plu
   4. With a deterministic AI update, check whether the tight `tol` converges on its own.
 - **Expected:** AI-REML 13 s to ~2 s on a typical peak, no jitter, and fewer iterations.
 
-### 3. Fit many phenotypes per R session (deferred)
+### 3. Fit many phenotypes per R session (merged)
 - One R process per task would build the design, contexts and donor structures once, then loop over
   peaks. Step 2 would run in the same session from the in-memory model, without saving it, and only
   one save would happen if the model is kept.
@@ -112,7 +112,19 @@ Where a typical converged peak's time goes (`[TIMING]` lines, 67 s of step 1 plu
   - saving the model once instead of twice.
 
 ## Status
+All three changes are merged into `main` (PR #10, merge b26838e; image built from 02b124f).
 - [x] Measurements and causes (this page)
-- [ ] 1: validation of `--tauZeroCutoff`, then merge
-- [ ] 2: R prototype of the exact trace, C++, A/B test
-- [ ] 3: cheap pieces measured; batching decided later
+- [x] 1: `--tauZeroCutoff` (8beb378). The caQTL runs use `--tol=1e-3 --tauZeroCutoff=1e-5`.
+- [x] 2: `--exactTrace` (22b07a0), plus `--activeSetAI` and `--tolEta` (6c86447), which fit the null model
+  to the constrained REML optimum.
+- [x] 3: `extdata/step12_batch_qtl.R` (e731da6) runs steps 1 and 2 of many peaks in one R session.
+  `feat/fast-step1` adds a donor-level variance ratio, in-memory model reuse and cheaper per-peak setup.
+
+Validation for the merge:
+- the tutorial (Steps 1-4) is byte-identical to upstream 39fbbe7 with default flags;
+- the 297 chr22 peaks have 0 failed, 0 unconverged and 0 step 1 fallbacks;
+- the genome-wide run (14,616 peaks) has 0 unconverged and 0 fallbacks, and its 26 failures are peaks with no
+  markers in the cis window.
+
+Speed: about 4.2 s per peak for steps 1 and 2 on a quiet node, against 84 s for the typical peak above.
+The genome-wide run took 4 h 41 min at 12 concurrent tasks.
