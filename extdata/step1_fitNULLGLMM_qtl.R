@@ -162,7 +162,7 @@ option_list <- list(
 
 ## list of options
 parser <- OptionParser(usage="%prog [options]", option_list=option_list)
-args <- parse_args(parser, positional_arguments = 0)
+args <- parse_args(parser, args = getOption("CASTIE.args", commandArgs(trailingOnly = TRUE)), positional_arguments = 0)  # step12_batch_qtl.R sets CASTIE.args
 opt <- args$options
 
 ## Fix: empty-string values for logical options (happens when shell vars are unset)

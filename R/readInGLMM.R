@@ -27,7 +27,7 @@ removeLOCOResult <- function(chromList, obj.glmm.null) {
     if (chr %in% chromList) {
       obj.glmm.null$LOCOResult[chr] <- list(NULL)
       cat("chromosome ", chr, " model results are removed to save memory\n")
-      gc()
+      castie_gc()
     }
   }
   return(obj.glmm.null)
@@ -55,7 +55,7 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
   modglmm$coefficients <- NULL
   modglmm$cov <- NULL
   # rm(modglmm)
-  gc()
+  castie_gc()
   # traitType = modglmm$traitType
   # y = modglmm$y
   # X = modglmm$X
@@ -70,7 +70,7 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
       for (chr in 1:22) {
         modglmm$LOCOResult[chr] <- list(NULL)
         cat("chromosome ", chr, " model results are removed to save memory\n")
-        gc()
+        castie_gc()
       }
     }
   } else {
@@ -109,7 +109,7 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
       chromList <- c(1:22)
       modglmm <- removeLOCOResult(chromList, modglmm)
     }
-    gc()
+    castie_gc()
   }
 
   modglmm$mu <- as.vector(modglmm$fitted.values)
@@ -126,7 +126,7 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
       modglmm$obj.noK$XVX_inv_XV <- NULL
     }
   }
-  gc()
+  castie_gc()
   tau <- modglmm$theta
   N <- length(modglmm$mu)
   if (modglmm$traitType == "binary") {

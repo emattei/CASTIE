@@ -696,7 +696,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
     rm(mmat)
     rm(mmat_nomissing)
-    gc()
+    castie_gc()
     isSparseGRMIdentity <- FALSE
     if (!is.null(sampleListwithGeno)) {
       indicatorGenoSamplesWithPheno <- (sampleListwithGeno$IndexGeno %in% dataMerge_sort$IndexGeno)
@@ -898,7 +898,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     # setupSparseGRM(dim(m4)[1], locationMatinR, valueVecinR)
     # setupSparseGRM_new(sparseGRMtest)
     # rm(sparseGRMtest)
-    gc()
+    castie_gc()
   }
 
   # allow for multiple variance components
@@ -1051,7 +1051,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = binomial, weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1076,7 +1076,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = gaussian(link = "identity"), weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1118,7 +1118,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = "poisson", weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1155,7 +1155,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = NegBin(), weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1269,7 +1269,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         fit0orig <- glm(formula.new.withCov, data = data.new, family = gaussian(link = "identity"), weights = varWeights)
         Xorig <- model.matrix(fit0orig)
         rm(fit0orig)
-        gc()
+        castie_gc()
         if (length(offsetCol) == 0) {
           fit0 <- glm(formula.new,
             data = data.new, offset = covoffset,
@@ -1475,7 +1475,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       offset0 <- modglmm$offset
       modglmm$offset <- NULL
       y <- fit0$y
-      gc()
+      castie_gc()
       # save(modglmm, file = modelOut)
       set_Diagof_StdGeno_LOCO()
       modglmm$LOCOResult <- list()
@@ -1532,12 +1532,12 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
           }
           save(modglmm, file = modelOutbychr, compress = FALSE)
           modglmm$LOCOResult[[j]] <- list(NULL)
-          gc()
+          castie_gc()
         } else {
           modglmm$LOCOResult[[j]] <- list(isLOCO = FALSE)
         }
       }
-      gc()
+      castie_gc()
       # modelOut_nonauto = paste(c(outputPrefix,"_noLOCO.rda"), collapse="")
     } else {
       # b = as.numeric(factor(dataMerge_sort$IID, levels =  unique(dataMerge_sort$IID)))
