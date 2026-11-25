@@ -458,9 +458,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
 #}) 
 
 
-  my_env = new.env()
-  load(paste0(outputprefixsubset, ".rda"), envir = my_env)
-  modglmm = my_env$modglmm
+  modglmm = castie_load_model(paste0(outputprefixsubset, ".rda"))
   print(modglmm$theta)
 
 if(!opt$isCovariateOffset){
@@ -1011,9 +1009,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
   m                   <- NULL  # always defined so rescue block is safe
 
   if (file.exists(model_file) && file.size(model_file) > 0) {
-    tmp_env <- new.env()
-    load(model_file, envir = tmp_env)
-    m <- tmp_env$modglmm
+    m <- castie_load_model(model_file)
     theta_vals <- m$theta
     converged  <- isTRUE(m$converged)
     if (!is.null(m$isCovariateOffset)) is_cov_offset_final <- m$isCovariateOffset
@@ -1033,8 +1029,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
   if (!overall_ok && !all_failed && !is.null(m) && !is.null(m$use_sandwich)) {
     m$use_sandwich <- rep(TRUE, length(m$use_sandwich))
     if (!is.null(m$eMatIsSample)) m$use_sandwich[m$eMatIsSample] <- FALSE
-    modglmm <- m
-    save(modglmm, file=model_file, compress=FALSE)
+    castie_save_model(m, model_file)
     use_sandwich <- m$use_sandwich  # keep local var in sync with what was saved
   }
 

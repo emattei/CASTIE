@@ -41,7 +41,7 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
     stop("LOCO should be TRUE or FALSE.")
   }
   # load GMMATmodelFile
-  load(GMMATmodelFile)
+  modglmm <- castie_load_model(GMMATmodelFile)
   # if(!modglmm$LOCO){
   #     if(LOCO){
   #             stop("LOCO is TRUE but the null model was not fit with LOCO=TRUE\n")
@@ -369,7 +369,7 @@ ReadModel_multiTrait <- function(GMMATmodelFileList = "", chrom = "", LOCO = TRU
   # Check file existence
   GMMATmodelFileVec <- unlist(strsplit(GMMATmodelFileList, split = ","))
   modglmmList <- list()
-  if (require("furrr")) {
+  if (length(GMMATmodelFileVec) > 1 && require("furrr")) { # one model: read it here, without future
     future::plan("multicore")
     modglmmList <- furrr::future_map(GMMATmodelFileVec, function(GMMATmodelFile) {
       ReadModel(GMMATmodelFile, chrom, LOCO, is_Firth_beta, is_EmpSPA, espa_nt, espa_range)

@@ -362,6 +362,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     }
   }
   .t0_total <- proc.time()
+  modglmmSaved <- NULL # the model as last saved to modelOut, when it is still in memory
 
   if (!file.exists(phenoFile)) {
     stop("ERROR! phenoFile ", phenoFile, " does not exsit\n")
@@ -579,6 +580,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     cat("formula is ", formula, "\n")
     formula.null <- as.formula(formula)
     mmat <- model.matrix(formula.null, data, na.action = NULL)
+    rownames(mmat) <- NULL # its "1".."N" row names make data.frame() and merge() ~50x slower; merge() drops them
     mmat <- data.frame(mmat)
     mmat <- cbind(mmat, data[, which(colnames(data) == phenoCol), drop = F])
     colnames(mmat)[ncol(mmat)] <- phenoCol
@@ -792,7 +794,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     formulaNewList <- paste0(formulaNewList, collapse = "")
     formulaNewList <- paste0(formulaNewList, "-1")
     formula.new <- as.formula(paste0(formulaNewList, collapse = ""))
-    data.new <- data.frame(cbind(out.transform$Y, out.transform$X1))
+    data.new <- data.frame(unname(cbind(out.transform$Y, out.transform$X1))) # no "1".."N" row names (slow); names set below
     colnames(data.new) <- c(phenoCol, out.transform$Param.transform$X_name)
     cat("colnames(data.new) is ", colnames(data.new), "\n")
     cat(
@@ -1549,6 +1551,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       modglmm$T_longl_vec <- dataMerge_sort$longlVar
       .t_pp_save <- proc.time()
       save(modglmm, file = modelOut, compress = FALSE)
+      modglmmSaved <- modglmm # what load(modelOut) returns below, without reading the file again
       if (verbose) cat(sprintf("[TIMING:PP] save modglmm: %.2fs\n", (proc.time() - .t_pp_save)[3]))
     }
 
@@ -1640,7 +1643,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       set_Diagof_StdGeno_LOCO()
     }
     cat("Start estimating variance ratios\n")
-    load(modelOut)
+    if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
     use_sandwich <- extractVarianceRatio_multiV(
       obj.glmm.null = modglmm,
       obj.glm.null = fit0, maxiterPCG = maxiterPCG,
@@ -1657,7 +1660,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       cateVarRatioMaxMACVecInclude = cateVarRatioMaxMACVecInclude,
       minMAFforGRM = minMAFforGRM, isDiagofKinSetAsOne = isDiagofKinSetAsOne,
       includeNonautoMarkersforVarRatio = includeNonautoMarkersforVarRatio, isStoreSigma = isStoreSigma, useGRMtoFitNULL = useGRMtoFitNULL,
-      smwCacheMemLimitMB = smwCacheMemLimitMB,
+      smwCacheMemLimitMB = smwCacheMemLimitMB, exactTrace = exactTrace,
       verbose = verbose
     )
   } else {
@@ -1667,7 +1670,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   closeGenoFile_plink()
   # clean up saved model (as in ReadModel)
   if (isShrinkModelOutput) {
-    load(modelOut)
+    if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
     modglmm$use_sandwich <- use_sandwich
     modglmm$useGRMtoFitNULL <- useGRMtoFitNULL # step 2 uses this to decide whether closed-form GxE conditioning applies
     modglmm$Y <- NULL
@@ -1690,7 +1693,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     modglmm$useGRMtoFitNULL <- useGRMtoFitNULL
   }
   # uncompressed: gzip of ~60 MB of doubles costs ~5 s per save (and ~1 s per load) for ~20% smaller files
-  save(modglmm, file = modelOut, compress = FALSE)
+  castie_save_model(modglmm, modelOut)
 
   cat(sprintf("[TIMING] Variance ratio estimation + final save: %.1fs\n", (proc.time() - .t_varratio)[3]))
   .report_mem("after Variance ratio estimation")
@@ -1728,6 +1731,7 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
                                         isStoreSigma = FALSE,
                                         useGRMtoFitNULL = TRUE,
                                         smwCacheMemLimitMB = NULL,
+                                        exactTrace = FALSE,
                                         verbose = FALSE) {
   obj.noK <- obj.glmm.null$obj.noK
   if (file.exists(testOut)) {
@@ -1930,6 +1934,14 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
   # var_weights_sample = var_weights[uniqsampleind]
 
 
+  vrDonor <- NULL
+  if (exactTrace && isStoreSigma && !useSparseGRMforVarRatio && !useGRMtoFitNULL && obj.glmm.null$traitType %in% c("binary", "count")) {
+    vrDonor <- .vr_donor_setup(obj.glmm.null, W, tauVecNew, b, Sigma_iX_noLOCO, XtSigma_iX_inv)
+    mI <- if (obj.glmm.null$traitType == "binary") mu * (1 - mu) * var_weights else mu * var_weights
+    mI <- as.vector(t(mI) %*% I_mat) # var2null_sample and var2null_noXadj weights, as in the loop below
+    tauValV <- tauVecNew[2]
+    n_donors <- ncol(I_mat) # the sandwich threshold below
+  }
   Vsample0 <- as.vector(t(obj.noK$V) %*% I_mat)
   Xsample0 <- obj.glmm.null$sampleXMat
   XVsample0 <- t(Xsample0 * Vsample0)
@@ -2002,12 +2014,14 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
             G0 <- 2 - G0
           }
           G0sample <- G0
-          G0 <- as.numeric(I_mat %*% G0sample)
+          G0 <- G0sample[b] # = I_mat %*% G0sample, exactly
+          gCell <- G0sample # the donor genotypes the cells carry
 
           CHR <- bimPlink[Indexvector_forVarRatio[i] + 1, 1]
           cat("CHR ", CHR, "\n")
           if (sum(G0) / (2 * length(G0)) > 0.5) {
             G0 <- 2 - G0
+            gCell <- 2 - G0sample
           }
           NAset <- which(G0 == 0)
           AC <- sum(G0)
@@ -2019,6 +2033,30 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
               autoMarker <- TRUE
             } else {
               autoMarker <- FALSE
+            }
+
+            if (!is.null(vrDonor)) { # exactTrace: the same quantities from donor-level forms (vr_donor.R)
+              v <- .vr_donor_marker(vrDonor, gCell)
+              cat("AC ", AC, "  S ", v$S, "  p_exact ", pchisq(v$S^2 / v$var1, df = 1, lower.tail = F), "\n")
+              var2sparseGE_vec <- vapply(seq_len(nE), function(ne) {
+                GEt_ne <- G0 * vrDonor$eMat[, ne] - as.vector(obj.noK$XXVX_inv %*% v$cE[, ne])
+                as.numeric(crossprod(GEt_ne, getSigma_G_V(W, tauValV, tauVecNew[1], GEt_ne, maxiterPCG, tolPCG)))
+              }, 0)
+              G_noXadj <- as.vector(G0sample - mean(G0sample))
+              G0_sample_tilde <- G0sample - XXVXsample_inv0 %*% (XVsample0 %*% G0sample)
+              var2_a <- t(G0_sample_tilde) %*% ((obj.glmm.null$spSigma) %*% G0_sample_tilde)
+              cat("AC ", AC, "  var1 ", v$var1, "  var2null ", v$var2null, "\n")
+              varRatio_sparseGRM_vec[n_acc] <- v$var1 / var2_a[1, 1]
+              varRatio_NULL_vec[n_acc] <- v$var1 / v$var2null
+              varRatio_NULL_sample_vec[n_acc] <- v$var1 / innerProduct(mI, G0_sample_tilde * G0_sample_tilde)
+              varRatio_NULL_noXadj_vec[n_acc] <- v$var1 / innerProduct(mI, G_noXadj * G_noXadj)
+              varRatio_NULL_eg_mat[n_acc, ] <- v$var1GE / v$var2nullGE
+              varRatio_sparse_eg_mat[n_acc, ] <- v$var1GE / var2sparseGE_vec
+              varModel_egcondg_mat[n_acc, ] <- v$varModelGEcond
+              varSW_egcondg_mat[n_acc, ] <- v$varSWGEcond
+              numTestedMarker <- numTestedMarker + 1
+              if (indexInMarkerList - 1 == length(listOfMarkersForVarRatio[[k]])) numTestedMarker <- numMarkers0
+              next
             }
 
             G <- G0 - obj.noK$XXVX_inv %*% (obj.noK$XV %*% G0) # G1 is X adjusted
