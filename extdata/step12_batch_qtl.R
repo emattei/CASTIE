@@ -5,18 +5,21 @@
 # and step1_fitNULLGLMM_qtl.R / step2_tests_qtl.R (found on PATH) are sourced with those arguments,
 # exactly as on the command line. One line per run goes to --results:
 #   <gene> TAB <step> TAB <seconds> TAB <"ok" or the error message>
-# Step 2 of a gene whose step 1 failed is skipped.
+# Step 2 of a gene whose step 1 failed is skipped. With --keepModels=FALSE no null model file is written: null models
+# stay in memory until the next step 1 line, so each gene's step 2 must follow its step 1.
 suppressPackageStartupMessages({
   library(CASTIE)
   library(optparse)
 })
 opt <- parse_args(OptionParser(option_list = list(
   make_option("--batch", type = "character", help = "Required. The runs, one per line (see above)"),
-  make_option("--results", type = "character", help = "Required. Where to append one line per run")
+  make_option("--results", type = "character", help = "Required. Where to append one line per run"),
+  make_option("--keepModels", type = "logical", default = TRUE,
+              help = "Optional. FALSE keeps null models in memory instead of writing the step 1 .rda files [default=TRUE]")
 )))
 script <- c("1" = unname(Sys.which("step1_fitNULLGLMM_qtl.R")), "2" = unname(Sys.which("step2_tests_qtl.R")))
 if (!all(nzchar(script))) stop("step1_fitNULLGLMM_qtl.R and step2_tests_qtl.R must be on PATH")
-options(CASTIE.gc = FALSE, CASTIE.cache = TRUE, CASTIE.fastGLM = TRUE) # no explicit gc(); read the phenotype metadata and transform the covariates once; glm.fit with Cholesky solves
+options(CASTIE.gc = FALSE, CASTIE.cache = TRUE, CASTIE.fastGLM = TRUE, CASTIE.keepModels = opt$keepModels) # no explicit gc(); read the phenotype metadata and transform the covariates once; glm.fit with Cholesky solves
 
 failed <- character(0)
 for (ln in readLines(opt$batch)) {
@@ -24,6 +27,7 @@ for (ln in readLines(opt$batch)) {
   gene <- f[1]
   step <- f[2]
   if (step == "2" && gene %in% failed) next
+  if (step == "1") castie_clear_models() # with --keepModels=FALSE, hold one gene's null models at a time
   con <- file(f[3], open = "a")
   sink(con)
   sink(con, type = "message")
