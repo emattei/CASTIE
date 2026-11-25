@@ -65,6 +65,7 @@ Where a typical converged peak's time goes (`[TIMING]` lines, 67 s of step 1 plu
    This is ~55 s of the ~84 s per typical peak.
 
 ## Plan
+The sections below are the plan as written before the work; the outcomes are under Status.
 
 ### 1. Separate the zeroing cutoff from `tol` (merged)
 - New option `--tauZeroCutoff` (branch `feat/tau-zero-cutoff`, `8beb378`). Variance components below it
@@ -72,7 +73,7 @@ Where a typical converged peak's time goes (`[TIMING]` lines, 67 s of step 1 plu
 - Only `fitNULLGLMM_multiV` and the two Poisson/binomial loops (`glmmkin.ai_PCG_Rcpp_multiV`,
   `_eMat`) change. `count_nb` is not touched.
 - Use for small variances: `--tol=1e-3` (or `1e-4`) `--tauZeroCutoff=1e-5`.
-- **Validation (running):**
+- **Validation (done, see Status):**
   - 32 chr22 peaks, made up of the 18 unconverged at the time plus 14 converged spanning fit times and
     zero/nonzero tau.
   - Each is fitted at `--tol` 1e-3 and 1e-4 with `--tauZeroCutoff=1e-5` and compared against the
@@ -121,7 +122,7 @@ All three changes are merged into `main` (PR #10, merge b26838e; image built fro
   `feat/fast-step1` adds a donor-level variance ratio, in-memory model reuse and cheaper per-peak setup.
 
 Validation for the merge:
-- the tutorial (Steps 1-4) is byte-identical to upstream 39fbbe7 with default flags;
+- the tutorial (Steps 1-4) is byte-identical to fork commit 39fbbe7 with default flags;
 - the 297 chr22 peaks have 0 failed, 0 unconverged and 0 step 1 fallbacks;
 - the genome-wide run (14,616 peaks) has 0 unconverged and 0 fallbacks, and its 26 failures are peaks with no
   markers in the cis window.
