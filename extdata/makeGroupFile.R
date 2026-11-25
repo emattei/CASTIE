@@ -8,6 +8,7 @@ options(stringsAsFactors=F)
 library(CASTIE)
 require(optparse) #install.packages("optparse")
 
+if (!nzchar(Sys.getenv("TZ"))) Sys.setenv(TZ = "UTC") # unset TZ makes sessionInfo() take seconds
 print(sessionInfo())
 
 ## set list of cmd line arguments

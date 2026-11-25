@@ -188,6 +188,7 @@ if(opt$library != ""){
   cat("Loaded CASTIE from default library path\n")
 }
 
+if (!nzchar(Sys.getenv("TZ"))) Sys.setenv(TZ = "UTC") # unset TZ makes sessionInfo() take seconds
 print(sessionInfo())
 print(opt)
 

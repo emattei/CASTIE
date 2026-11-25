@@ -183,6 +183,7 @@ if(opt$library != ""){
 
 BLASctl_installed <- require(RhpcBLASctl)
 
+if (!nzchar(Sys.getenv("TZ"))) Sys.setenv(TZ = "UTC") # unset TZ makes sessionInfo() take seconds
 print(sessionInfo())
 print(opt)
 
