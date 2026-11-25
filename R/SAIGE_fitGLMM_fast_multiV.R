@@ -1939,7 +1939,6 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
     vrDonor <- .vr_donor_setup(obj.glmm.null, W, tauVecNew, b, Sigma_iX_noLOCO, XtSigma_iX_inv)
     mI <- if (obj.glmm.null$traitType == "binary") mu * (1 - mu) * var_weights else mu * var_weights
     mI <- as.vector(t(mI) %*% I_mat) # var2null_sample and var2null_noXadj weights, as in the loop below
-    tauValV <- tauVecNew[2]
     n_donors <- ncol(I_mat) # the sandwich threshold below
   }
   Vsample0 <- as.vector(t(obj.noK$V) %*% I_mat)
@@ -2038,10 +2037,6 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
             if (!is.null(vrDonor)) { # exactTrace: the same quantities from donor-level forms (vr_donor.R)
               v <- .vr_donor_marker(vrDonor, gCell)
               cat("AC ", AC, "  S ", v$S, "  p_exact ", pchisq(v$S^2 / v$var1, df = 1, lower.tail = F), "\n")
-              var2sparseGE_vec <- vapply(seq_len(nE), function(ne) {
-                GEt_ne <- G0 * vrDonor$eMat[, ne] - as.vector(obj.noK$XXVX_inv %*% v$cE[, ne])
-                as.numeric(crossprod(GEt_ne, getSigma_G_V(W, tauValV, tauVecNew[1], GEt_ne, maxiterPCG, tolPCG)))
-              }, 0)
               G_noXadj <- as.vector(G0sample - mean(G0sample))
               G0_sample_tilde <- G0sample - XXVXsample_inv0 %*% (XVsample0 %*% G0sample)
               var2_a <- t(G0_sample_tilde) %*% ((obj.glmm.null$spSigma) %*% G0_sample_tilde)
@@ -2051,7 +2046,7 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
               varRatio_NULL_sample_vec[n_acc] <- v$var1 / innerProduct(mI, G0_sample_tilde * G0_sample_tilde)
               varRatio_NULL_noXadj_vec[n_acc] <- v$var1 / innerProduct(mI, G_noXadj * G_noXadj)
               varRatio_NULL_eg_mat[n_acc, ] <- v$var1GE / v$var2nullGE
-              varRatio_sparse_eg_mat[n_acc, ] <- v$var1GE / var2sparseGE_vec
+              varRatio_sparse_eg_mat[n_acc, ] <- v$var1GE / v$var2sparseGE
               varModel_egcondg_mat[n_acc, ] <- v$varModelGEcond
               varSW_egcondg_mat[n_acc, ] <- v$varSWGEcond
               numTestedMarker <- numTestedMarker + 1

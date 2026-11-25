@@ -1,3 +1,5 @@
+.bim_cache <- new.env(parent = emptyenv()) # setGenoInput, options(CASTIE.cache = TRUE)
+
 #' Check if sample identifiers are stored in a BGEN file (for BGEN v1.2)
 #'
 #' Check if sample identifiers are stored in a BGEN file (for BGEN v1.2)
@@ -163,6 +165,15 @@ setGenoInput <- function(bgenFile = "",
     if (famFile == "") {
       famFile <- gsub("bed$", "fam", bedFile)
     }
+    # options(CASTIE.cache = TRUE) (step12_batch_qtl.R): the marker table of the same bim file is built once per
+    # session (3.5 s per gene for chr1)
+    bimKey <- if (isTRUE(getOption("CASTIE.cache"))) {
+      fi <- file.info(bimFile, extra_cols = FALSE)
+      paste(normalizePath(bimFile), fi$size, as.numeric(fi$mtime), AlleleOrder, chrom)
+    }
+    if (!is.null(bimKey) && identical(.bim_cache$key, bimKey)) {
+      markerInfo <- data.table::copy(.bim_cache$markerInfo)
+    } else {
     markerInfo <- data.table::fread(bimFile, header = F, select = c(1, 2, 4, 5, 6))
     # markerInfo = as.data.frame(markerInfo)
     # markerInfo is a data.table
@@ -189,6 +200,8 @@ setGenoInput <- function(bgenFile = "",
     markerInfo[, REF := NULL]
     markerInfo[, ALT := NULL]
     setkeyv(markerInfo, c("ID", "ID2"))
+    if (!is.null(bimKey)) list2env(list(key = bimKey, markerInfo = data.table::copy(markerInfo)), envir = .bim_cache)
+    }
     # markerInfo$genoIndex_prev = NULL
     # sampleInfo = data.table::fread(famFile, select = c(2), data.table=F)
     # samplesInGeno = sampleInfo[,1]
