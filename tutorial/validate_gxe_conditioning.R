@@ -18,7 +18,7 @@ load(args[1])                     # modglmm
 m <- modglmm
 
 ## ---- null model pieces ----
-X    <- t(m$obj.noK$XV) / as.vector(m$obj.noK$V)        # cell-level design (as used in step 1)
+X    <- if (is.null(m$X)) t(m$obj.noK$XV) / as.vector(m$obj.noK$V) else m$X  # cell-level design (as used in step 1)
 mu   <- as.vector(m$fitted.values)
 vw   <- as.vector(m$varWeights)
 W    <- mu * vw                                          # count trait: mu.eta^2/variance * var_weights

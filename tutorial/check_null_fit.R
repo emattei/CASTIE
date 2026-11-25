@@ -6,7 +6,7 @@
 for (f in commandArgs(TRUE)) {
   e <- new.env(); load(f, envir = e); m <- e$modglmm
   mu <- as.vector(m$fitted.values); n <- length(mu); th <- m$theta
-  X <- m$obj.noK$XXVX_inv %*% m$obj.noK$XVX
+  X <- if (is.null(m$X)) m$obj.noK$XXVX_inv %*% m$obj.noK$XVX else m$X # older null models lack X
   y <- as.vector(m$y); off <- if (is.null(m$offset)) 0 else as.vector(m$offset)
   Yw <- log(mu) - off + (y - mu) / mu                   # working response, Poisson log link
   W <- mu; U <- cbind(1, m$eMat); K <- ncol(U)

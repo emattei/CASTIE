@@ -114,6 +114,7 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
   modglmm$mu <- as.vector(modglmm$fitted.values)
   ## clean
   modglmm$fitted.values <- NULL
+  modglmm$obj.noK <- .restore_noK_XV(modglmm$obj.noK, modglmm$X)
   if (sum(duplicated(modglmm$sampleID)) > 0) {
     modglmm$obj.noK$Sigma_iXXSigma_iX <- matrix(1)
     modglmm$X <- NULL
