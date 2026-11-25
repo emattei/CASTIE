@@ -575,7 +575,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
 
     .t_dataprep <- proc.time()
-    print("HERERE2")
 
     if (length(covarColList) > 0) {
       formula <- paste0("`", phenoCol, "`~", paste0(covarColList,
@@ -669,8 +668,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       dataMerge_sort$IIDgeno <- dataMerge_sort$IID
     }
 
-    print("Test")
-    print(head(dataMerge_sort))
     # dataMerge_sort = dataMerge
 
     if (length(eCovarCol) > 0) {
@@ -747,8 +744,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   }
 
 
-  print("Test3")
-  print(head(dataMerge_sort))
 
   if (traitType == "quantitative" & invNormalize) {
     cat(
@@ -767,8 +762,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   #      dataMerge_sort <- dataMerge_sort[, !(names(dataMerge_sort) %in%
   # 	      eCovarCol)]
   # }
-  print("Test4")
-  print(head(dataMerge_sort))
   if (traitType == "binary" & (length(covarColList) > 0)) {
     out_checksep <- checkPerfectSep(formula.null,
       data = dataMerge_sort,
@@ -788,7 +781,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       out_checksep)]
   }
   if (!hasCovariate) {
-    print("No covariate is includes so isCovariateOffset = FALSE")
+    cat("No covariate is includes so isCovariateOffset = FALSE\n")
     isCovariateOffset <- FALSE
   }
 
@@ -870,7 +863,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         family = NegBin(), weights = varWeights
       )
     } else {
-      print(head(data.new))
       offsetColVal <- data.new[, which(colnames(data.new) == offsetCol)]
       modwitcov <- glm(formula.new,
         offset = offsetColVal, data = data.new,
@@ -882,7 +874,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
   if (isCovariateOffset) {
     covoffset <- mmat[, -1, drop = F] %*% modwitcov$coefficients[-1]
-    print("isCovariateOffset=TRUE, so fixed effects coefficnets won't be estimated.")
+    cat("isCovariateOffset=TRUE, so fixed effects coefficnets won't be estimated.\n")
     formula.new.withCov <- formula.new
     formula_nocov <- paste0("`", phenoCol, "`~ 1")
     formula.new <- as.formula(formula_nocov)
@@ -898,7 +890,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (!isSparseGRMIdentity) {
       getsubGRM_orig(sparseGRMFile, sparseGRMSampleIDFile, relatednessCutoff, dataMerge_sort$IID)
     } else {
-      print(length(dataMerge_sort$IIDgeno))
       sparseGRM <- Matrix:::sparseMatrix(i = as.vector(1:nrow(data.new)), j = as.vector(1:nrow(data.new)), x = rep(1, nrow(data.new)), symmetric = TRUE)
       setupSparseGRM_new(sparseGRM)
     }
@@ -921,19 +912,13 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
   numofV <- get_numofV()
 
-  print(dataMerge_sort$IID[1:200])
-  print(any(duplicated(dataMerge_sort$IID)))
 
   cat("numofV ", numofV, "\n")
 
   if (is.null(eMat)) {
     if (any(duplicated(dataMerge_sort$IID))) {
-      print("HERE")
       if (longlCol == "") {
-        print("HERE1")
-        print(useGRMtoFitNULL)
         if (useGRMtoFitNULL) {
-          print("HERE2")
           num_Kmat <- numofV + 3
           cat("num_Kmat ", num_Kmat, "\n")
         } else {
@@ -999,11 +984,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   cat("num_Kmat ", num_Kmat, "\n")
 
 
-  if (!is.null(eMat)) {
-    print("dim(eMat)")
-    print(dim(eMat))
-    # 	k = 3
-  }
 
 
   if (longlCol != "") {
@@ -1049,10 +1029,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (uniqPheno[1] != 0 | uniqPheno[2] != 1) {
       stop("ERROR! phenotype value needs to be 0 or 1 \n")
     }
-    print("formula.new")
-    print(formula.new)
-    print("head(data.new)")
-    print(head(data.new))
     if (!isCovariateOffset) {
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new, data = data.new, family = binomial, weights = varWeights)
@@ -1184,7 +1160,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
 
   cat("glm:\n")
-  print(fit0)
   obj.noK <- NULL
 
 
@@ -1193,8 +1168,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   # }else{
   #  isStoreSigma = TRUE
   # }
-  print("isStoreSigma")
-  print(isStoreSigma)
   # set_store_sigma(isStoreSigma)
 
   cat(sprintf("[TIMING] Initial GLM fit: %.1fs\n", (proc.time() - .t_glm)[3]))
@@ -1204,7 +1177,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     # setisUseSparseSigmaforNullModelFitting(useSparseGRMtoFitNULL)
     cat("Start fitting the NULL GLMM\n")
     t_begin <- proc.time()
-    print(t_begin)
 
 
     tau <- rep(0, k)
@@ -1232,8 +1204,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         ))
       } else { # if(length(eCovarCol) == 0){
 
-        print("glmmkin.ai_PCG_Rcpp_multiV_eMat")
-        print(fit0)
 
         system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV_eMat(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
@@ -1313,9 +1283,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     } else {
       if (hasCovariate) {
         data.new.X <- model.matrix(fit0)[, -1, drop = F]
-        print(head(data.new))
-        print(head(data.new.X))
-        print(head(modglmm$coefficients[-1]))
         modglmm$offset <- data.new.X %*% (as.vector(modglmm$coefficients[-1]))
         if (LOCO) {
           for (j in 1:22) {
@@ -1574,9 +1541,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
 
     t_end <- proc.time()
-    print(t_end)
     cat("t_end - t_begin, fitting the NULL model took\n")
-    print(t_end - t_begin)
 
 
     # if(bedFile != "" & !useGRMtoFitNULL){
@@ -1586,9 +1551,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         subSampleInGeno <- dataMerge_sort$IndexPheno
       }
 
-      print(subSampleInGeno[1:1000])
-      print(head(dataMerge_sort))
-      print("HEREHRE")
 
       subSampleInGeno_unique <- subSampleInGeno[!duplicated(subSampleInGeno)]
 
@@ -1614,9 +1576,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       subSampleInGeno <- dataMerge_sort$IndexPheno
     }
 
-    print(subSampleInGeno[1:1000])
-    print(head(dataMerge_sort))
-    print("HEREHRE")
 
     subSampleInGeno_unique <- subSampleInGeno[!duplicated(subSampleInGeno)]
 
@@ -1644,9 +1603,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   if (!skipVarianceRatioEstimation) {
     if (LOCO) {
       MsubIndVec <- getQCdMarkerIndex()
-      print(length(MsubIndVec))
       chrVec <- data.table:::fread(bimFile, header = F)[, 1]
-      print(length(chrVec))
       chrVec <- chrVec[which(MsubIndVec == TRUE)]
       updatechrList <- updateChrStartEndIndexVec(chrVec)
       LOCO <- updatechrList$LOCO
@@ -1755,7 +1712,6 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
   }
 
   family <- obj.glm.null$family
-  print(family)
   eta <- obj.glmm.null$linear.predictors
   mu <- obj.glmm.null$fitted.values
   mu.eta <- family$mu.eta(eta)
@@ -1769,12 +1725,8 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
   # }
 
 
-  print("mu[1:20]")
-  print(mu[1:20])
   W <- sqrtW^2 ## (mu*(1-mu) for binary)
   W <- W * var_weights
-  print("mu[1:20]")
-  print(W[1:20])
   tauVecNew <- obj.glmm.null$theta
 
   # isStoreSigma=FALSE
@@ -2364,7 +2316,6 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
         if (indexInMarkerList - 1 == length(listOfMarkersForVarRatio[[k]])) {
           ratioCV <- ratioCVcutoff
           cat("no more markers are available in the MAC category ", k, "\n")
-          print(indexInMarkerList - 1)
         }
       } # end of while(ratioCV > ratioCVcutoff)
 
@@ -2421,8 +2372,6 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
           varRatioTable <- rbind(varRatioTable, c(varRatio_NULL_eg_vec[ne], "null", 0))
           varRatioTable <- rbind(varRatioTable, c(varRatio_sparse_eg_vec[ne], "sparse", 0))
         }
-        print(varRatio_NULL_eg_vec)
-        print(varRatio_NULL_eg_mat)
       }
 
       varRatioTable <- rbind(varRatioTable, c(varRatio_null, "null", k))
@@ -2455,16 +2404,13 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
     median_ratios <- apply(varSWtoModel_egcondg_mat, 2, median, na.rm = TRUE)
     cat("threshold for using sandwich variance:", threshold, "\n")
     cat("median sandwich/model variance ratios per context:\n")
-    print(median_ratios)
     use_sandwich <- median_ratios > threshold
     # for donor level context, do not use sandwich variance
     use_sandwich[obj.glmm.null$eMatIsSample] <- FALSE
     cat("use_sandwich per context:\n")
-    print(use_sandwich)
   }
 
   data <- read.table(varRatioOutFile, header = F)
-  print(data)
   return(use_sandwich)
 }
 
@@ -2516,7 +2462,6 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
   print(length(indicatorGenoSamplesWithPheno))
   # if((!useSparseGRMtoFitNULL & useGRMtoFitNULL) | (skipVarianceRatioEstimation)){
   if (bedFile != "" & !useSparseGRMtoFitNULL & useGRMtoFitNULL) {
-    print("HEREHRE")
 
     re1 <- system.time({
       setgeno(bedFile, bimFile, famFile, subSampleInGeno, indicatorGenoSamplesWithPheno, memoryChunk, isDiagofKinSetAsOne)
@@ -2921,34 +2866,29 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
   #  model output for the null glmm
 
   t_begin <- proc.time()
-  print(t_begin)
   subSampleInGeno <- subPheno$IndexGeno
   if (is.null(subPheno$IndexGeno)) {
     subSampleInGeno <- subPheno$IndexPheno
   }
   if (verbose) {
-    print("Start reading genotype plink file here")
+    cat("Start reading genotype plink file here\n")
   }
 
   # print("subSampleInGeno")
   # print(subSampleInGeno)
 
-  print(head(subPheno))
   set_dup_sample_index(as.numeric(factor(subPheno$IID, levels = unique(subPheno$IID))))
 
 
-  print("length(indicatorGenoSamplesWithPheno)")
-  print(length(indicatorGenoSamplesWithPheno))
   # if((!useSparseGRMtoFitNULL & useGRMtoFitNULL) | (skipVarianceRatioEstimation)){
   if (bedFile != "" & !useSparseGRMtoFitNULL & useGRMtoFitNULL) {
-    print("HEREHRE")
 
     re1 <- system.time({
       setgeno(bedFile, bimFile, famFile, subSampleInGeno, indicatorGenoSamplesWithPheno, memoryChunk, isDiagofKinSetAsOne)
     })
   }
   if (verbose) {
-    print("Genotype reading is done")
+    cat("Genotype reading is done\n")
   }
 
   if (LOCO) {
@@ -2992,7 +2932,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
 
 
   cat("tauInit")
-  print(tauInit)
 
   tau[1:length(tau)] <- 0
   if (family$family %in% c("poisson", "binomial")) {
@@ -3029,23 +2968,16 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
 
   if (!is.null(covarianceIdxMat)) {
     idxtau2 <- intersect(covarianceIdxMat[, 1], idxtau)
-    print("covarianceIdxMat")
-    print(covarianceIdxMat)
-    print("idxtau2")
-    print(idxtau2)
     if (length(idxtau2) > 0) {
       tau[idxtau2] <- 0
     }
     # i_kmat = get_numofV()
     # if(i_kmat > 0){
     Kmatdiag <- getMeanDiagofKmat(LOCO)
-    print(Kmatdiag)
     # }
     tau[2:length(tau)] <- tau[2:length(tau)] / Kmatdiag
   }
 
-  print("tau")
-  print(tau)
 
 
   #### set up weights for variance
@@ -3074,10 +3006,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
   tau0 <- tau
   tau0_q2 <- tau[fixtau == 0]
   # tau[2] = max(0, tau0[2] + tau0[2]^2 * (re$YPAPY - re$Trace)/n)
-  print("tau0_q2 a")
-  print(tau0_q2)
-  print("idxtau")
-  print(idxtau)
 
 
   tau_q2 <- pmax(0, tau0_q2 + tau0_q2^2 * (re$YPAPY - re$Trace) / n)
@@ -3086,14 +3014,10 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
   if (!is.null(covarianceIdxMat)) {
     tau[idxtau[which(idxtau %in% idxtau2)]] <- 0
   }
-  print("re$YPAPY")
-  print(re$YPAPY)
-  print("re$Trace")
-  print(re$Trace)
 
   if (verbose) {
     cat("Variance component estimates:\n")
-    print(tau)
+    cat(tau, "\n")
   }
 
   maxiter_in <- maxiter
@@ -3124,7 +3048,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
     re.coef <- Get_Coef_multiV(y, X, tau, family, alpha0, eta0, offset, verbose = verbose, maxiterPCG = maxiterPCG, tolPCG = tolPCG, maxiter = maxiter, LOCO = FALSE, var_weights = var_weights)
     t_end_Get_Coef <- proc.time()
     cat("t_end_Get_Coef - t_begin_Get_Coef\n")
-    print(t_end_Get_Coef - t_begin_Get_Coef)
     # if(isStoreSigma){
     #  gen_sp_Sigma_multiV(re.coef$W, tau)
     # }
@@ -3134,7 +3057,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
 
     t_end_fitglmmaiRPCG <- proc.time()
     cat("t_end_fitglmmaiRPCG - t_begin_fitglmmaiRPCG\n")
-    print(t_end_fitglmmaiRPCG - t_end_Get_Coef)
 
     tau <- as.numeric(fit$tau)
     cov <- re.coef$cov
@@ -3153,7 +3075,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
     W <- sqrtW^2
 
 
-    print(abs(tau - tau0) / (abs(tau) + abs(tau0) + tol))
     cat("tau: ", tau, "\n")
     cat("tau0: ", tau0, "\n")
 
@@ -3250,7 +3171,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
   glmmResult$LOCO <- LOCO
   t_end_null <- proc.time()
   cat("t_end_null - t_begin, fitting the NULL model without LOCO took\n")
-  print(t_end_null - t_begin)
   # if(isStoreSigma){
   #   gen_sp_Sigma_multiV(re.coef$W, tau)
   # }
@@ -3270,7 +3190,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
         re.coef_LOCO <- Get_Coef_multiV(y, X, tau, family, alpha, eta, offset, verbose = verbose, maxiterPCG = maxiterPCG, tolPCG = tolPCG, maxiter = maxiter, LOCO = TRUE, var_weights = varWeights)
         t_end_Get_Coef_LOCO <- proc.time()
         cat("t_end_Get_Coef_LOCO - t_begin_Get_Coef_LOCO\n")
-        print(t_end_Get_Coef_LOCO - t_begin_Get_Coef_LOCO)
         cov <- re.coef_LOCO$cov
         alpha <- re.coef_LOCO$alpha
         eta <- re.coef_LOCO$eta

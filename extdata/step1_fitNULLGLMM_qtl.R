@@ -687,8 +687,6 @@ if(!is.null(tauTable)){
 tauInit = colMeans(tauTable)
 #opt$maxiter = 1
 
-print("tauInit")
-print(tauInit)
 }else{
 tauInit <- convertoNumeric(strsplit(opt$tauInit, ",")[[1]], "tauInit")
 }

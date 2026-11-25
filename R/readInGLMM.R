@@ -65,7 +65,6 @@ ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_bet
   chrom_v3 <- NULL
 
   if (!LOCO) {
-    print("Leave-one-chromosome-out is not applied")
     if (modglmm$LOCO) {
       for (chr in 1:22) {
         modglmm$LOCOResult[chr] <- list(NULL)
@@ -397,7 +396,6 @@ Get_Variance_Ratio_multiTrait <- function(varianceRatioFileList, cateVarRatioMin
   for (vrl in 1:length(varianceRatioFileVec)) {
     varianceRatioFile <- varianceRatioFileVec[vrl]
     ratioVecList <- Get_Variance_Ratio(varianceRatioFile, cateVarRatioMinMACVecExclude, cateVarRatioMaxMACVecInclude, isGroupTest, isSparseGRM)
-    print(ratioVecList)
     ratioVec_sparse <- cbind(ratioVec_sparse, ratioVecList$ratioVec_sparse)
     ratioVec_null <- cbind(ratioVec_null, ratioVecList$ratioVec_null)
     ratioVec_null_sample <- cbind(ratioVec_null_sample, ratioVecList$ratioVec_null_sample)

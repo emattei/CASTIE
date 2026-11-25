@@ -271,8 +271,6 @@ for(i in 1:length(weights.beta.list)){
 
 }
 
-print("opt$r.corr")
-print(opt$r.corr)
 
 if(packageVersion("CASTIE")>="0.2.2"){
 SPAGMMATtest(vcfFile=opt$vcfFile,
