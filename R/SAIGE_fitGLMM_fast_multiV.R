@@ -650,7 +650,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
     if (!is.null(sampleListwithGeno)) {
       dataMerge <- merge(mmat_nomissing, sampleListwithGeno,
-        by.x = "IID", by.y = "IIDgeno"
+        by.x = "IID", by.y = "IIDgeno", sort = FALSE # the stable order(IndexGeno) below fixes the row order either way
       )
       dataMerge_sort <- dataMerge[with(dataMerge, order(IndexGeno)), ]
       # dataMerge_sort = dataMerge[with(dataMerge, order(IndexPheno)),]
@@ -1205,7 +1205,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (is.na(tauZeroCutoff)) tauZeroCutoff <- tol  # original behaviour: tol is both the convergence tolerance and the zeroing cutoff
     if (traitType != "count_nb") {
       if (length(eCovarCol) == 0) {
-        system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
+        system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
           tau = tau, fixtau = fixtau, maxiter = maxiter,
           tol = tol, tauZeroCutoff = tauZeroCutoff, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
@@ -1223,7 +1223,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         print("glmmkin.ai_PCG_Rcpp_multiV_eMat")
         print(fit0)
 
-        system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV_eMat(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
+        system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV_eMat(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
           tau = tau, fixtau = fixtau, maxiter = maxiter,
           tol = tol, tauZeroCutoff = tauZeroCutoff, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
@@ -1243,7 +1243,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       cat(sprintf("[TIMING] AIREML null model fitting: %.1fs\n", (proc.time() - t_begin)[3]))
       .report_mem("after AIREML null model fitting")
     } else {
-      system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV_NB(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
+      system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV_NB(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
         fit0,
         tau = tau, fixtau = fixtau, maxiter = maxiter,
         tol = tol, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,

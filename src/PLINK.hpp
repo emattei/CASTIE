@@ -31,7 +31,7 @@ private:
   
   // input file stream of .bed file
   //std::ifstream m_ibedFile;
-  FILE *m_fin; 
+  FILE *m_fin = NULL;
 
   // PLINK files
   std::string m_bimFile, m_famFile, m_bedFile;
@@ -155,6 +155,7 @@ public:
   }
 
   void closegenofile();
+  ~PlinkClass() { if (m_fin) fclose(m_fin); }
 
 };
 

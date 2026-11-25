@@ -846,10 +846,9 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
 .thetaOK <- function(suffix) {
   rda <- paste0(opt$outputPrefix, suffix, ".rda")
   if (!file.exists(rda) || file.size(rda) == 0) return(FALSE)
-  e <- new.env()
-  ok <- tryCatch({ load(rda, envir = e); TRUE }, error = function(e) FALSE)
-  if (!ok) return(FALSE)
-  m <- e$modglmm; print(m$theta)
+  m <- tryCatch(castie_load_model(rda), error = function(e) FALSE) # the in-memory model when it is the one just saved
+  if (isFALSE(m)) return(FALSE)
+  print(m$theta)
   !is.null(m$theta) &&
     !(sum(m$theta[2:length(m$theta)]) < 0 || sum(m$theta[2:length(m$theta)]) >10)
 }

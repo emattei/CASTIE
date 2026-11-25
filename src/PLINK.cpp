@@ -156,7 +156,8 @@ void PlinkClass::setPosSampleInPlink(std::vector<std::string> & t_SampleInModel)
 // }
 
 void PlinkClass::closegenofile(){
-        fclose(m_fin);
+        if (m_fin) fclose(m_fin);
+        m_fin = NULL;
 	//m_ibedFile.close();
 }
 

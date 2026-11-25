@@ -1409,6 +1409,7 @@ void setPLINKobjInCPP(std::string t_bimFile,
                       std::vector<std::string> & t_SampleInModel,
                       std::string t_AlleleOrder)
 {
+  delete ptr_gPLINKobj; // the previous gene's object: a session can run many genes
   ptr_gPLINKobj = new PLINK::PlinkClass(t_bimFile,
                                         t_famFile,
                                         t_bedFile,
@@ -1515,6 +1516,7 @@ void setSAIGEobjInCPP(arma::mat & t_XVX,
 {
 	//t_SigmaMat_sp.print("t_SigmaMat_sp");
   // check SAIGE.cpp
+  delete ptr_gSAIGEobj; // the previous gene's object (~70 MB of N x p matrices)
   ptr_gSAIGEobj = new SAIGE::SAIGEClass(
 	t_XVX,
         t_XXVX_inv,
@@ -6511,6 +6513,83 @@ arma::fvec GetTrace_multiV(arma::fmat Sigma_iX, arma::fmat& Xmat, arma::fvec& wV
 
 
 
+// Sigma^-1 B, column by column, when getPCG1ofSigmaAndVector_multiV would take the individual-level Woodbury
+// path (Case 2). The per-donor setup does not depend on the right-hand side, so it is done once for all the
+// columns instead of once per column; the per-column arithmetic is that of getPCG1ofSigmaAndVector_multiV, so
+// every column is the same to the bit.
+static bool sigmaInvCase2Applies(arma::fvec& tauVec, int Nnomissing) {
+  return !g_isStoreSigma && !g_usePCG && g_EMat.n_rows == (arma::uword)Nnomissing &&
+         g_EMat.n_cols != (arma::uword)Nnomissing && g_EMat.n_cols < 100 && tauVec.n_elem >= 3 &&
+         arma::any(slopeTauVec(tauVec) != 0);
+}
+
+static arma::fmat getSigmaInvMat_case2(arma::fvec& wVec, arma::fvec& tauVec, const arma::fmat& Bmat) {
+  int k = g_EMat.n_cols;
+  arma::fmat xMat(Bmat.n_rows, Bmat.n_cols);
+  auto n_individuals = g_I_start_indices.n_elem - 1;
+  float inv_tau0 = 1.0f / tauVec(0);
+  float tau1 = tauVec(1);
+  arma::frowvec sqrt_tau2 = arma::sqrt(slopeTauVec(tauVec)).t();
+
+#ifdef _OPENMP
+  omp_set_num_threads(g_omp_num_threads);
+  #pragma omp parallel for schedule(static)
+#endif
+  for (size_t j = 0; j < n_individuals; j++) {
+    size_t start = g_I_start_indices[j];
+    size_t end = g_I_start_indices[j+1];
+    int cells_in_individual = end - start;
+    if (cells_in_individual == 0) continue;
+
+    arma::fvec w_ind = wVec.subvec(start, end-1);
+    arma::fmat E_ind = g_EMat.rows(start, end-1).t();
+    arma::fvec w_inv_tau0 = w_ind * inv_tau0;
+    float sum_w = arma::sum(w_ind);
+
+    arma::fmat U_ind = E_ind.t();
+    U_ind.each_row() %= sqrt_tau2;
+    arma::fmat A_inv_U_ind(cells_in_individual, k);
+    if (tau1 == 0) {
+      for (int covar = 0; covar < k; covar++) {
+        A_inv_U_ind.col(covar) = w_inv_tau0 % U_ind.col(covar);
+      }
+    } else {
+      float denominator = 1 + tau1 * (sum_w * inv_tau0);
+      float factor = (tau1 * inv_tau0) * inv_tau0 / denominator;
+      for (int covar = 0; covar < k; covar++) {
+        arma::fvec u_col = U_ind.col(covar);
+        float sum_wu = arma::sum(w_ind % u_col);
+        A_inv_U_ind.col(covar) = w_inv_tau0 % u_col - (factor * sum_wu) * w_inv_tau0;
+      }
+    }
+    arma::fmat VT_A_inv_U = U_ind.t() * A_inv_U_ind;
+    arma::fmat I_k = arma::eye<arma::fmat>(k, k);
+    arma::fmat middle_inv;
+    try {
+      middle_inv = arma::inv(I_k + VT_A_inv_U);
+    } catch (...) {
+      middle_inv = arma::pinv(I_k + VT_A_inv_U);
+    }
+
+    for (arma::uword c = 0; c < Bmat.n_cols; c++) {
+      arma::fvec b_ind = Bmat.col(c).subvec(start, end-1);
+      arma::fvec x_base_ind(cells_in_individual);
+      if (tau1 == 0) {
+        x_base_ind = w_inv_tau0 % b_ind;
+      } else {
+        float sum_wb = arma::sum(w_ind % b_ind);
+        float denominator = 1 + tau1 * (sum_w * inv_tau0);
+        float correction_factor = (tau1 * inv_tau0) * (sum_wb * inv_tau0) / denominator;
+        x_base_ind = w_inv_tau0 % b_ind - correction_factor * w_inv_tau0;
+      }
+      arma::fvec correction_ind = A_inv_U_ind * (middle_inv * (U_ind.t() * x_base_ind));
+      xMat.col(c).subvec(start, end-1) = x_base_ind - correction_ind;
+    }
+  }
+  return xMat;
+}
+
+
 // [[Rcpp::export]]
 Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec& wVec,  arma::fvec& tauVec, int maxiterPCG, float tolPCG, bool LOCO){
 
@@ -6518,15 +6597,22 @@ Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec
         arma::fvec Sigma_iY;
 	std::cout << "before Sigma_iY" << std::endl;
 	std::cout << "Yvec.n_elem " << Yvec.n_elem << std::endl;
-        Sigma_iY = getPCG1ofSigmaAndVector_multiV(wVec, tauVec, Yvec, maxiterPCG, tolPCG, LOCO);
-        std::cout << "after Sigma_iY" << std::endl;
         int colNumX = Xmat.n_cols;
         arma::fmat Sigma_iX(Nnomissing,colNumX);
+        if (sigmaInvCase2Applies(tauVec, Nnomissing)) { // Sigma^-1 [Y, X] with one Woodbury setup per donor
+          arma::fmat Sigma_iYX = getSigmaInvMat_case2(wVec, tauVec, arma::join_rows(Yvec, Xmat));
+          Sigma_iY = Sigma_iYX.col(0);
+          Sigma_iX = Sigma_iYX.cols(1, colNumX);
+          std::cout << "after Sigma_iY" << std::endl;
+        } else {
+        Sigma_iY = getPCG1ofSigmaAndVector_multiV(wVec, tauVec, Yvec, maxiterPCG, tolPCG, LOCO);
+        std::cout << "after Sigma_iY" << std::endl;
         arma::fvec XmatVecTemp;
         for(int i = 0; i < colNumX; i++){
                 XmatVecTemp = Xmat.col(i);
                 Sigma_iX.col(i) = getPCG1ofSigmaAndVector_multiV(wVec, tauVec, XmatVecTemp, maxiterPCG, tolPCG, LOCO);
 
+        }
         }
         arma::fmat Xmatt = Xmat.t();
         //arma::fmat cov = inv_sympd(Xmatt * Sigma_iX);
@@ -8052,6 +8138,7 @@ void  parallelsumTwoVec(arma::fvec &x) {
 
 // [[Rcpp::export]]
 void setgenoNULL(){
+	delete ptr_gNULLGENOobj; // the previous gene's object
 	ptr_gNULLGENOobj = new NullGENO::NullGenoClass();
 }
 // [[Rcpp::export]]
