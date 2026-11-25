@@ -2509,10 +2509,6 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
   alpha0 <- fit0$coef
   eta0 <- eta
 
-
-  cat("tauInit")
-  print(tauInit)
-
   tau[1:length(tau)] <- 0
   if (family$family %in% c("poisson", "binomial")) {
     # if(family$family %in% c("binomial")) {
@@ -2928,9 +2924,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
 
   alpha0 <- fit0$coef
   eta0 <- eta
-
-
-  cat("tauInit:", tauInit, "\n")
 
   tau[1:length(tau)] <- 0
   if (family$family %in% c("poisson", "binomial")) {
