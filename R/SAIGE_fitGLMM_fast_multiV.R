@@ -1612,6 +1612,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     }
     cat("Start estimating variance ratios\n")
     if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
+    modglmm$obj.noK <- .restore_noK_XV(modglmm$obj.noK, modglmm$X) # skipModelFitting: a slimmed null model
     use_sandwich <- extractVarianceRatio_multiV(
       obj.glmm.null = modglmm,
       obj.glm.null = fit0, maxiterPCG = maxiterPCG,
@@ -1648,12 +1649,15 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     modglmm$obj.noK$XVX_inv_XV <- NULL # built by ScoreTest_NULL_Model, read nowhere
     if (sum(duplicated(modglmm$sampleID)) > 0) {
       modglmm$obj.noK$Sigma_iXXSigma_iX <- matrix(1)
-      modglmm$X <- NULL
       if (is.null(modglmm$eMat)) {
+        modglmm$X <- NULL
         modglmm$obj.noK$XV <- NULL
         modglmm$obj.noK$XVX <- NULL
         modglmm$obj.noK$XXVX_inv <- NULL
         modglmm$obj.noK$XVX_inv <- NULL
+      } else {
+        modglmm$obj.noK$XV <- NULL # ReadModel rebuilds both from X
+        modglmm$obj.noK$XXVX_inv <- NULL
       }
     }
   } else {
