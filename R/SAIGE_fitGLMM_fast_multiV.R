@@ -363,7 +363,15 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   }
   .t0_total <- proc.time()
   # options(CASTIE.fastGLM = TRUE): every glm() below fits with castie_glm_fit (glm.fit with Cholesky solves)
-  if (isTRUE(getOption("CASTIE.fastGLM"))) glm <- function(...) stats::glm(..., method = castie_glm_fit)
+  # (the caller's own call is re-evaluated, so glm()'s match.call and model.frame see the original arguments)
+  if (isTRUE(getOption("CASTIE.fastGLM"))) {
+    glm <- function(...) {
+      cl <- match.call()
+      cl[[1L]] <- quote(stats::glm)
+      cl$method <- quote(castie_glm_fit)
+      eval(cl, parent.frame())
+    }
+  }
   modglmmSaved <- NULL # the model as last saved to modelOut, when it is still in memory
 
   if (!file.exists(phenoFile)) {
