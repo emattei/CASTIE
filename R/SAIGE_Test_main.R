@@ -542,7 +542,7 @@ SPAGMMATtest <- function(bgenFile = "",
         S_a_gxe <- matrix(1)
         varWeights_gxe <- cbind(varWeights_gxe, obj.model$varWeights)
         if (gxe_conditioning == "model") {
-          ## X is dropped from repeated-measures model files; recover it exactly from XV = t(X * V)
+          ## ReadModel drops X from repeated-measures null models; recover it from XV = t(X * V)
           X_cell_gxe <- rbind(X_cell_gxe, t(obj.model$obj.noK$XV) / as.vector(obj.model$obj.noK$V))
           ## working weights used for Sigma in step 1 (mu.eta^2 / variance * var_weights)
           vw <- as.vector(obj.model$varWeights)

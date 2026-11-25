@@ -77,7 +77,7 @@ ScoreTest_NULL_Model <- function(mu, mu2, y, X) {
 
 # XV and XXVX_inv of a saved null model, which keeps X instead: the operations of ScoreTest_NULL_Model
 .restore_noK_XV <- function(obj.noK, X) {
-  if (is.null(obj.noK$XV) && !is.null(X) && !is.null(obj.noK$XVX_inv)) {
+  if (is.null(obj.noK[["XV"]]) && !is.null(X) && !is.null(obj.noK[["XVX_inv"]])) { # [[ ]]: $ partial-matches
     obj.noK$XV <- t(X * obj.noK$V)
     obj.noK$XXVX_inv <- X %*% obj.noK$XVX_inv
   }
