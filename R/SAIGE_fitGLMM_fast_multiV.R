@@ -52,6 +52,10 @@
 #'   By default, FALSE.
 #' @param exactTrace logical. Exact variance-component traces from the donor-block structure instead of random
 #'   vectors (dynamic covariates, repeated cells per donor, no GRM, binary or count traits). By default, FALSE.
+#' @param activeSetAI logical. In the AI-REML step, variance components at 0 whose score points below 0 stay at 0
+#'   and leave the system, so they do not pull the other components. By default, FALSE.
+#' @param tolEta numeric. The inner fixed-effect loop also requires max |change in the linear predictor| < tolEta
+#'   (random effects included). By default, Inf (only the 10% test on the fixed effects).
 #' @return a file ended with .rda that contains the glmm model information, a file ended with .varianceRatio.txt that contains the variance ratio values, and a file ended with #markers.SPAOut.txt that contains the SPAGMMAT tests results for the markers used for estimating the variance ratio.
 #' @export
 fitNULLGLMM_multiV <- function(plinkFile = "",
@@ -124,6 +128,8 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
                                smwCacheMemLimitMB = NULL,
                                perContextTau = FALSE,
                                exactTrace = FALSE,
+                               activeSetAI = FALSE,
+                               tolEta = Inf,
                                verbose = FALSE) {
   ## set up output files
   modelOut <- paste0(outputPrefix, ".rda")
@@ -970,6 +976,8 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     )
   }
   set_exactTrace(exactTrace)
+  set_activeSetAI(activeSetAI)
+  options(CASTIE.tolEta = tolEta) # read by Get_Coef_multiV
   k <- num_Kmat
 
 

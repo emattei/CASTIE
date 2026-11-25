@@ -1,6 +1,10 @@
 # Run iterations to get converged alpha and eta
 Get_Coef_multiV <- function(y, X, tau, family, alpha0, eta0, offset, maxiterPCG, tolPCG, maxiter, verbose = FALSE, LOCO = FALSE, var_weights = NULL) {
   tol.coef <- 0.1
+  # fitNULLGLMM_multiV(tolEta): also require the linear predictor, random effects included, to settle;
+  # the alpha test alone (10% relative) can stop while the working response is still moving
+  tolEta <- getOption("CASTIE.tolEta", Inf)
+  eta_prev <- eta0
   mu <- family$linkinv(eta0)
   mu.eta <- family$mu.eta(eta0)
   Y <- eta0 - offset + (y - mu) / mu.eta
@@ -48,10 +52,12 @@ Get_Coef_multiV <- function(y, X, tau, family, alpha0, eta0, offset, maxiterPCG,
     W <- sqrtW^2
     # sqrtW = mu.eta/sqrt(family$variance(mu))
     # W = sqrtW^2
-    if (max(abs(alpha - alpha0) / (abs(alpha) + abs(alpha0) + tol.coef)) < tol.coef) {
+    if (max(abs(alpha - alpha0) / (abs(alpha) + abs(alpha0) + tol.coef)) < tol.coef &&
+      (is.infinite(tolEta) || max(abs(eta - eta_prev)) < tolEta)) {
       break
     }
     alpha0 <- alpha
+    eta_prev <- eta
   }
 
   print("alpha")

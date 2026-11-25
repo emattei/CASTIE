@@ -73,6 +73,7 @@ arma::uvec g_covarianceidxMat_notcol1;
 arma::fmat g_EMat;
 bool g_perContextTau = false;  // tau = (tau0, tau1, one slope tau per E column)
 bool g_exactTrace = false;     // GetTrace_multiV_eMat: exact donor-block traces instead of random vectors
+bool g_activeSetAI = false;    // AI step: components at 0 with a negative score stay at 0 (see aiStep)
 arma::fvec  g_EEt_eigenvalVec;
 arma::fvec g_EEt_diagVec;
 arma::fmat g_EEt_eigenvecMat;
@@ -4530,6 +4531,29 @@ arma::fvec slopeTauVec(arma::fvec & tauVec){
 	return v;
 }
 
+// [[Rcpp::export]]
+void set_activeSetAI(bool t_activeSetAI){
+	g_activeSetAI = t_activeSetAI;
+}
+
+// AI-REML step Dtau = AI^-1 score over the free components. With activeSetAI, components at 0 whose score
+// points below 0 leave the system and stay at 0, so their scores do not pull the others away from the
+// constrained REML optimum (scores 0 for components > 0, <= 0 for components at 0).
+arma::fvec aiStep(arma::fmat& AI1, arma::fvec& score1, arma::fvec tau0_free){
+	arma::fvec Dtau(AI1.n_cols, arma::fill::zeros);
+	arma::uvec act = arma::regspace<arma::uvec>(0, AI1.n_cols - 1);
+	if(g_activeSetAI) act = arma::find((tau0_free > 0) + (score1 > 0));
+	if(act.n_elem == 0) return Dtau;
+	try{
+		Dtau.elem(act) = arma::solve(AI1.submat(act, act), score1.elem(act), arma::solve_opts::allow_ugly);
+	}
+	catch(std::runtime_error&){
+		std::cout << "arma::solve(AI, score): AI seems singular, using less variant components matrix is suggested." << std::endl;
+		Dtau.zeros();
+	}
+	return Dtau;
+}
+
 // Donor-blocked kernel of E column j: e_j % (I I^T (e_j % b))
 arma::fvec eKernel(arma::fvec & bVec, unsigned int j){
 	arma::fvec e = g_EMat.col(j);
@@ -5651,13 +5675,7 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         arma::fmat AI1 = re["AI"];
         arma::fvec Dtau(AI1.n_cols);
         score1.print("score");
-        try{
-                Dtau = arma::solve(AI1, score1, arma::solve_opts::allow_ugly);
-        }
-        catch(std::runtime_error){
-                std::cout << "arma::solve(AI, score): AI seems singular, using less variant components matrix is suggested." << std::endl;
-                Dtau.zeros();
-        }
+        Dtau = aiStep(AI1, score1, tauVec.elem(idxtau));
         arma::fvec Dtau_k1(k1);
         Dtau_k1.zeros();
 
@@ -9266,13 +9284,7 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         arma::fmat AI1 = re["AI"];
         arma::fvec Dtau(AI1.n_cols);
         score1.print("score");
-        try{
-                Dtau = arma::solve(AI1, score1, arma::solve_opts::allow_ugly);
-        }
-        catch(std::runtime_error){
-                std::cout << "arma::solve(AI, score): AI seems singular, using less variant components matrix is suggested." << std::endl;
-                Dtau.zeros();
-        }
+        Dtau = aiStep(AI1, score1, tauVec.elem(idxtau));
         arma::fvec Dtau_k1(k1);
         Dtau_k1.zeros();
 

@@ -669,6 +669,16 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// set_activeSetAI
+void set_activeSetAI(bool t_activeSetAI);
+RcppExport SEXP _CASTIE_set_activeSetAI(SEXP t_activeSetAISEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< bool >::type t_activeSetAI(t_activeSetAISEXP);
+    set_activeSetAI(t_activeSetAI);
+    return R_NilValue;
+END_RCPP
+}
 // getCrossprodMatAndKin
 arma::fvec getCrossprodMatAndKin(arma::fcolvec& bVec, bool LOCO);
 RcppExport SEXP _CASTIE_getCrossprodMatAndKin(SEXP bVecSEXP, SEXP LOCOSEXP) {
@@ -2706,6 +2716,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CASTIE_set_EMat", (DL_FUNC) &_CASTIE_set_EMat, 1},
     {"_CASTIE_set_perContextTau", (DL_FUNC) &_CASTIE_set_perContextTau, 1},
     {"_CASTIE_set_exactTrace", (DL_FUNC) &_CASTIE_set_exactTrace, 1},
+    {"_CASTIE_set_activeSetAI", (DL_FUNC) &_CASTIE_set_activeSetAI, 1},
     {"_CASTIE_getCrossprodMatAndKin", (DL_FUNC) &_CASTIE_getCrossprodMatAndKin, 2},
     {"_CASTIE_getCrossprod_multiV", (DL_FUNC) &_CASTIE_getCrossprod_multiV, 4},
     {"_CASTIE_getDiagOfSigma_multiV", (DL_FUNC) &_CASTIE_getDiagOfSigma_multiV, 3},
