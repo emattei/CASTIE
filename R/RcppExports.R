@@ -189,6 +189,10 @@ set_perContextTau <- function(t_perContextTau) {
     invisible(.Call('_CASTIE_set_perContextTau', PACKAGE = 'CASTIE', t_perContextTau))
 }
 
+set_exactTrace <- function(t_exactTrace) {
+    invisible(.Call('_CASTIE_set_exactTrace', PACKAGE = 'CASTIE', t_exactTrace))
+}
+
 getCrossprodMatAndKin <- function(bVec, LOCO) {
     .Call('_CASTIE_getCrossprodMatAndKin', PACKAGE = 'CASTIE', bVec, LOCO)
 }

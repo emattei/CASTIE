@@ -72,6 +72,7 @@ arma::uvec g_covarianceidxMat_col3;
 arma::uvec g_covarianceidxMat_notcol1;
 arma::fmat g_EMat;
 bool g_perContextTau = false;  // tau = (tau0, tau1, one slope tau per E column)
+bool g_exactTrace = false;     // GetTrace_multiV_eMat: exact donor-block traces instead of random vectors
 arma::fvec  g_EEt_eigenvalVec;
 arma::fvec g_EEt_diagVec;
 arma::fmat g_EEt_eigenvecMat;
@@ -9670,7 +9671,57 @@ double trace_EE_P() {
 
 
 // [[Rcpp::export]]
+void set_exactTrace(bool t_exactTrace){
+	g_exactTrace = t_exactTrace;
+}
+
+// Exact tr(P K_k) for the donor-blocked kernels of a model without GRM: K_1 = I I^T (donor intercept) and
+// diag(e_j) I I^T diag(e_j) per E column (eKernel; summed when one slope variance is shared).
+// Within donor d, Sigma_d = diag(tau0 / w) + U_d G U_d^T with U = [1, E], G = diag(tau1, slope taus).
+// With A_d = U_d^T W_d U_d (W = w / tau0): tr(Sigma^-1 Z_a Z_a^T) = sum_d [A_d (I + G A_d)^-1]_aa, valid
+// also when some taus are 0; tr(P Z_a Z_a^T) subtracts tr(M_a cov M_a^T), M_a = Z_a^T Sigma^-1 X.
+arma::fvec exactTrace_multiV_eMat(arma::fmat& Sigma_iX, arma::fvec& wVec, arma::fvec& tauVec, arma::ivec& fixtauVec, arma::fmat& cov1){
+	if(g_isGRM || g_I_longl_mat.n_rows == 0 || g_T_longl_mat.n_rows > 0 || g_covarianceidxMat.n_rows > 0 || fixtauVec(0) == 0){
+		Rcpp::stop("exactTrace needs repeated samples (I_longl) without GRM, longlCol or covariance terms, and a fixed tau0");
+	}
+	unsigned int n = wVec.n_elem, C = g_EMat.n_cols, K = 1 + C, D = g_I_longl_mat.n_cols;
+	arma::uvec donor(n);
+	for(arma::sp_fmat::const_iterator it = g_I_longl_mat.begin(); it != g_I_longl_mat.end(); ++it) donor(it.row()) = it.col();
+	arma::mat U(n, K);
+	U.col(0).ones();
+	U.cols(1, C) = arma::conv_to<arma::mat>::from(g_EMat);
+	arma::vec w = arma::conv_to<arma::vec>::from(wVec) / tauVec(0);
+	arma::vec g(K);
+	g(0) = tauVec(1);
+	g.subvec(1, C) = arma::conv_to<arma::vec>::from(slopeTauVec(tauVec));
+
+	arma::cube A(K, K, D, arma::fill::zeros);
+	for(unsigned int i = 0; i < n; i++) A.slice(donor(i)) += w(i) * (U.row(i).t() * U.row(i));
+	arma::vec t(K, arma::fill::zeros);
+	arma::mat G = arma::diagmat(g), IK = arma::eye(K, K);
+	for(unsigned int d = 0; d < D; d++) t += arma::diagvec(A.slice(d) * arma::inv(IK + G * A.slice(d)));
+
+	arma::mat SX = arma::conv_to<arma::mat>::from(Sigma_iX), cv = arma::conv_to<arma::mat>::from(cov1);
+	for(unsigned int a = 0; a < K; a++){
+		arma::mat M(D, SX.n_cols, arma::fill::zeros);
+		for(unsigned int i = 0; i < n; i++) M.row(donor(i)) += U(i, a) * SX.row(i);
+		t(a) -= arma::accu((M * cv) % M);
+	}
+
+	arma::fvec full(g_num_Kmat, arma::fill::zeros);
+	full(1) = t(0);
+	if(g_perContextTau){
+		for(unsigned int j = 0; j < C; j++) full(2 + j) = t(1 + j);
+	}else{
+		full(2) = arma::accu(t.subvec(1, C));
+	}
+	return full.elem(arma::find(fixtauVec == 0));
+}
+
+// [[Rcpp::export]]
 arma::fvec GetTrace_multiV_eMat(arma::fmat Sigma_iX, arma::fmat& Xmat, arma::fvec& wVec, arma::fvec& tauVec, arma::ivec & fixtauVec, arma::fmat& cov1,  int nrun, int maxiterPCG, float tolPCG, float traceCVcutoff, bool LOCO){
+
+        if(g_exactTrace) return exactTrace_multiV_eMat(Sigma_iX, wVec, tauVec, fixtauVec, cov1);
 
         set_seed(200);
 

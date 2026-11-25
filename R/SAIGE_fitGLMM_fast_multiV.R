@@ -50,6 +50,8 @@
 #' @param isShrinkModelOutput logical. remove unnecessary objects for step2 from the model output. By default, FALSE.
 #' @param perContextTau logical. Fit one random-slope variance per column of eCovarCol, not one shared value.
 #'   By default, FALSE.
+#' @param exactTrace logical. Exact variance-component traces from the donor-block structure instead of random
+#'   vectors (dynamic covariates, repeated cells per donor, no GRM, binary or count traits). By default, FALSE.
 #' @return a file ended with .rda that contains the glmm model information, a file ended with .varianceRatio.txt that contains the variance ratio values, and a file ended with #markers.SPAOut.txt that contains the SPAGMMAT tests results for the markers used for estimating the variance ratio.
 #' @export
 fitNULLGLMM_multiV <- function(plinkFile = "",
@@ -121,6 +123,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
                                isShrinkModelOutput = FALSE,
                                smwCacheMemLimitMB = NULL,
                                perContextTau = FALSE,
+                               exactTrace = FALSE,
                                verbose = FALSE) {
   ## set up output files
   modelOut <- paste0(outputPrefix, ".rda")
@@ -959,6 +962,14 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (length(tauInit) != num_Kmat) tauInit <- c(1, 0.1, rep(0, ncol(eMat)))
   }
   set_perContextTau(perContextTau)
+  if (exactTrace && (is.null(eMat) || !any(duplicated(dataMerge_sort$IID)) || useGRMtoFitNULL || numofV > 0 ||
+    longlCol != "" || !(traitType %in% c("binary", "count")))) {
+    stop(
+      "exactTrace=TRUE needs dynamic covariates, repeated cells per donor, useGRMtoFitNULL=FALSE, ",
+      "no Vmat files, no longlCol and traitType binary or count\n"
+    )
+  }
+  set_exactTrace(exactTrace)
   k <- num_Kmat
 
 
