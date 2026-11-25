@@ -837,10 +837,10 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
       isShrinkModelOutput=opt$isShrinkModelOutput, eCovarCol=ecovars, perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB, verbose=opt$verbose
     ),
-    error = function(e) { cat("Fit failed:", e$message, "\n"); NULL }
+    error = function(e) { cat("Fit failed:", e$message, "\n"); FALSE }
   )
   if (usePCG) set_usePCG(FALSE)
-  !is.null(result)
+  !isFALSE(result) # FALSE when the fit errored, even if it left a model (without variance ratios) on disk
 }
 
 .thetaOK <- function(suffix) {
@@ -893,8 +893,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
   if (start_stage <= 2) {
     # Stage 2: SMW + offset=TRUE
     cat("Trying Stage 2: SMW + isCovariateOffset=TRUE\n")
-    .fitStage(".stage2", isCovOff=TRUE, usePCG=FALSE)
-    if (.thetaOK(".stage2")) {
+    if (.fitStage(".stage2", isCovOff=TRUE, usePCG=FALSE) && .thetaOK(".stage2")) {
       .promote(".stage2")
       step1_used_offset <<- TRUE
       cat("Stage 2 succeeded\n")
@@ -907,8 +906,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
   # Stages 2b/2c: retry with tauInit=c(1,0.1,0) if current tauInit differs
   if (!solved && !.tau_is_default(tauInit)) {
     cat("Stage 2 theta OOB. Trying tauInit=1,0.1,0: SMW + isCovariateOffset=FALSE\n")
-    .fitStage(".stage2b", isCovOff=FALSE, usePCG=FALSE, tauInitVal=.tau_default)
-    if (.thetaOK(".stage2b")) {
+    if (.fitStage(".stage2b", isCovOff=FALSE, usePCG=FALSE, tauInitVal=.tau_default) && .thetaOK(".stage2b")) {
       .promote(".stage2b")
       step1_tau_switched <<- TRUE
       cat("Stage 2b succeeded\n")
@@ -916,8 +914,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
     } else {
       .cleanup(".stage2b")
       cat("Stage 2b theta OOB. Trying tauInit=1,0.1,0: SMW + isCovariateOffset=TRUE\n")
-      .fitStage(".stage2c", isCovOff=TRUE, usePCG=FALSE, tauInitVal=.tau_default)
-      if (.thetaOK(".stage2c")) {
+      if (.fitStage(".stage2c", isCovOff=TRUE, usePCG=FALSE, tauInitVal=.tau_default) && .thetaOK(".stage2c")) {
         .promote(".stage2c")
         step1_used_offset <<- TRUE
         step1_tau_switched <<- TRUE
@@ -932,8 +929,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
   if (!solved) {
     # Stage 3: PCG + offset=FALSE
     cat("Trying Stage 3: PCG + isCovariateOffset=FALSE\n")
-    .fitStage(".stage3", isCovOff=FALSE, usePCG=TRUE, tauInitVal=.tau_default)
-    if (.thetaOK(".stage3")) {
+    if (.fitStage(".stage3", isCovOff=FALSE, usePCG=TRUE, tauInitVal=.tau_default) && .thetaOK(".stage3")) {
       .promote(".stage3")
       step1_used_pcg <<- TRUE
       cat("Stage 3 succeeded\n")
@@ -996,7 +992,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
   var_ratio_file <- ""
   for (f in c(paste0(outputPrefix_varRatio, ".varianceRatio.txt"),
               paste0(outputPrefix, ".varianceRatio.txt"))) {
-    if (file.exists(f)) { var_ratio_file <- f; break }
+    if (file.exists(f) && file.size(f) > 0) { var_ratio_file <- f; break } # created empty before the fit
   }
 
   # Load final model to read theta and convergence
