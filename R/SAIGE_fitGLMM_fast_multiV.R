@@ -372,7 +372,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       eval(cl, parent.frame())
     }
   }
-  modglmmSaved <- NULL # the model as last saved to modelOut, when it is still in memory
+  modglmmSaved <- NULL # the model load(modelOut) would return, kept in memory instead of read back
 
   if (!file.exists(phenoFile)) {
     stop("ERROR! phenoFile ", phenoFile, " does not exsit\n")
@@ -1527,10 +1527,11 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       # modglmm$I_longl_vec = b - 1
       # modglmm$T_longl_mat = I_mat * (dataMerge_sort$longlVar)
       modglmm$T_longl_vec <- dataMerge_sort$longlVar
-      .t_pp_save <- proc.time()
-      save(modglmm, file = modelOut, compress = FALSE)
-      modglmmSaved <- modglmm # what load(modelOut) returns below, without reading the file again
-      if (verbose) cat(sprintf("[TIMING:PP] save modglmm: %.2fs\n", (proc.time() - .t_pp_save)[3]))
+      modglmmSaved <- modglmm # what load(modelOut) returns below, without writing it twice
+      on.exit(if (!is.null(modglmmSaved)) { # stopped before the final save: leave this model on disk, as before
+        modglmm <- modglmmSaved
+        save(modglmm, file = modelOut, compress = FALSE)
+      }, add = TRUE)
     }
 
     if (sum(modglmm$theta[2:length(modglmm$theta)]) < 0 || sum(modglmm$theta[2:length(modglmm$theta)]) > 10) {
@@ -1661,6 +1662,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   }
   # uncompressed: gzip of ~60 MB of doubles costs ~5 s per save (and ~1 s per load) for ~20% smaller files
   castie_save_model(modglmm, modelOut)
+  modglmmSaved <- NULL # saved, so the exit handler has nothing to write
 
   cat(sprintf("[TIMING] Variance ratio estimation + final save: %.1fs\n", (proc.time() - .t_varratio)[3]))
   .report_mem("after Variance ratio estimation")
