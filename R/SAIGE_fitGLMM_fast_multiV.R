@@ -575,7 +575,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
 
     .t_dataprep <- proc.time()
-    print("HERERE2")
 
     if (length(covarColList) > 0) {
       formula <- paste0("`", phenoCol, "`~", paste0(covarColList,
@@ -669,7 +668,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       dataMerge_sort$IIDgeno <- dataMerge_sort$IID
     }
 
-    print("Test")
     print(head(dataMerge_sort))
     # dataMerge_sort = dataMerge
 
@@ -747,7 +745,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   }
 
 
-  print("Test3")
   print(head(dataMerge_sort))
 
   if (traitType == "quantitative" & invNormalize) {
@@ -767,7 +764,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   #      dataMerge_sort <- dataMerge_sort[, !(names(dataMerge_sort) %in%
   # 	      eCovarCol)]
   # }
-  print("Test4")
   print(head(dataMerge_sort))
   if (traitType == "binary" & (length(covarColList) > 0)) {
     out_checksep <- checkPerfectSep(formula.null,
@@ -1588,7 +1584,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
       print(subSampleInGeno[1:1000])
       print(head(dataMerge_sort))
-      print("HEREHRE")
 
       subSampleInGeno_unique <- subSampleInGeno[!duplicated(subSampleInGeno)]
 
@@ -1616,7 +1611,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
     print(subSampleInGeno[1:1000])
     print(head(dataMerge_sort))
-    print("HEREHRE")
 
     subSampleInGeno_unique <- subSampleInGeno[!duplicated(subSampleInGeno)]
 
@@ -2516,7 +2510,6 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
   print(length(indicatorGenoSamplesWithPheno))
   # if((!useSparseGRMtoFitNULL & useGRMtoFitNULL) | (skipVarianceRatioEstimation)){
   if (bedFile != "" & !useSparseGRMtoFitNULL & useGRMtoFitNULL) {
-    print("HEREHRE")
 
     re1 <- system.time({
       setgeno(bedFile, bimFile, famFile, subSampleInGeno, indicatorGenoSamplesWithPheno, memoryChunk, isDiagofKinSetAsOne)
@@ -2941,7 +2934,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
   print(length(indicatorGenoSamplesWithPheno))
   # if((!useSparseGRMtoFitNULL & useGRMtoFitNULL) | (skipVarianceRatioEstimation)){
   if (bedFile != "" & !useSparseGRMtoFitNULL & useGRMtoFitNULL) {
-    print("HEREHRE")
 
     re1 <- system.time({
       setgeno(bedFile, bimFile, famFile, subSampleInGeno, indicatorGenoSamplesWithPheno, memoryChunk, isDiagofKinSetAsOne)

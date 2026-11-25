@@ -35,14 +35,6 @@ Get_Coef_multiV <- function(y, X, tau, family, alpha0, eta0, offset, maxiterPCG,
 
 
     Y <- eta - offset + (y - mu) / mu.eta
-    print("alpha")
-    print(alpha)
-    print("alpha0")
-    print(alpha0)
-    print("y[1]")
-    print(y[1])
-    print("y[2]")
-    print(y[2])
 
     # if(is.null(var_weights)){
     # sqrtW = mu.eta/sqrt(family$variance(mu))
@@ -63,8 +55,6 @@ Get_Coef_multiV <- function(y, X, tau, family, alpha0, eta0, offset, maxiterPCG,
   # before its last update of Y and W, and for sparse counts Y = eta + (y - mu) / mu moves a lot with eta.
   if (!is.infinite(tolEta)) re.coef <- getCoefficients_multiV(Y, X, W, tau, maxiter = maxiterPCG, tol = tolPCG, LOCO)
 
-  print("alpha")
-  print(alpha)
   # sqrtW = mu.eta/sqrt(1/as.vector(var_weights)*family$variance(mu))
   # W = sqrtW^2
   re <- list(Y = Y, alpha = alpha, eta = eta, W = W, cov = re.coef$cov, sqrtW = sqrtW, Sigma_iY = re.coef$Sigma_iY, Sigma_iX = re.coef$Sigma_iX, mu = mu)
