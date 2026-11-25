@@ -23,9 +23,9 @@ Get_Coef_multiV <- function(y, X, tau, family, alpha0, eta0, offset, maxiterPCG,
 
     if (verbose) {
       cat("Tau:\n")
-      print(tau)
+      cat(tau, "\n")
       cat("Fixed-effect coefficients:\n")
-      print(alpha)
+      cat(alpha, "\n")
     }
     mu <- family$linkinv(eta)
     mu.eta <- family$mu.eta(eta)

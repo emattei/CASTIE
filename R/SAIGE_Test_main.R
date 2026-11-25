@@ -283,10 +283,6 @@ SPAGMMATtest <- function(bgenFile = "",
     max_MAC_use_ER <- 0
   }
 
-  if (!LOCO) {
-    # 	LOCO = FALSE
-    print("LOCO = FASLE and leave-one-chromosome-out is not applied")
-  }
 
   isSparseGRM <- is_sparseGRM
 
@@ -349,8 +345,6 @@ SPAGMMATtest <- function(bgenFile = "",
     condition_genoIndex <- extract_genoIndex_condition(condition, objGeno$markerInfo, genoType)
     # }else{
     condition_genoIndex_a <- condition_genoIndex$cond_genoIndex
-    print("condition_genoIndex_a")
-    print(condition_genoIndex_a)
   }
   # set up the SAIGE object based on the null model results
   # print("SigmaMat_sp")
@@ -387,7 +381,6 @@ SPAGMMATtest <- function(bgenFile = "",
     # SigmaMat_sp = chol2inv(chol(obj.model.List[[1]]$spSigma))
     for (gm in 1:length(obj.model.List)) {
       SigmaMat_sp <- cbind(SigmaMat_sp, obj.model.List[[gm]]$spSigma)
-      print(dim(SigmaMat_sp))
       # SigmaMat_sp = SigmaMat_sp %*% I_mat
       # SigmaMat_sp = t(I_mat)%*%SigmaMat_sp
       # print(dim(SigmaMat_sp))
@@ -615,66 +608,6 @@ SPAGMMATtest <- function(bgenFile = "",
   # print("XXVXsample_inv")
   # print(XXVXsample_inv)
   if (sum(duplicated(obj.model.List[[1]]$sampleID)) > 0) {
-    if (FALSE) {
-      print("XXVXsample_inv")
-      print(length(XVXsample))
-      print(length(XXVXsample_inv))
-      print(length(XVsample))
-      print(XXVXsample_inv)
-      print(XVsample)
-      print(length(XVX_inv_XVsample))
-      print(length(Sigma_iXXSigma_iX))
-      print(length(Xsample))
-      print(length(S_a_sample))
-      print(length(res_sample))
-      print(length(mu2_sample))
-      print(length(mu_sample))
-      print(ratioVecList)
-      print(length(as.matrix(ratioVecList$ratioVec_sparse)))
-      print(length(as.matrix(ratioVecList$ratioVec_null)))
-      print(length(as.matrix(ratioVecList$ratioVec_null_noXadj)))
-      print(length(as.matrix(ratioVecList$ratioVec_null_eg)))
-      print(length(as.matrix(ratioVecList$ratioVec_sparse_eg)))
-      print(length(cateVarRatioMinMACVecExclude))
-      print(length(cateVarRatioMaxMACVecInclude))
-      print(length(SPAcutoff))
-      print(length(theta))
-      print(length(varWeights_sample))
-      print(length(traitType))
-      print(length(y))
-      print(length(impute_method))
-      print(length(isSparseGRM))
-      print(length(is_noadjCov))
-      print(length(pval_cutoff_for_fastTest))
-      print(length(isCondition))
-      print(length(condition_genoIndex_a))
-      print(length(is_Firth_beta))
-      print(length(pCutoffforFirth))
-      print(length(offset))
-      print(length(obj_cc_res.out))
-      print(length(SigmaMat_sp))
-      print(length(obj.model$tauVal_sp))
-      print(obj.model$tauVal_sp)
-      print("ok")
-      print(length(I_mat))
-      print(length(b - 1))
-      print(length(T_longl_mat))
-      print(length(obj.model.List[[1]]$T_longl_vec))
-      print(length(is_EmpSPA))
-      print(obj.model$cumul)
-      print(isgxe_vec[1])
-      print(dim(XV_gxe))
-      print(dim(X_gxe))
-      print(dim(XVX_inv_XV_gxe))
-      print(dim(XVX_gxe))
-      print(dim(S_a_gxe))
-      print(dim(XXVX_inv_gxe))
-      print(dim(y_gxe))
-      print(dim(res_gxe))
-      print(dim(mu2_gxe))
-      print(dim(mu_gxe))
-      print(varWeights_gxe)
-    }
 
     # print("OKKKK")
     # print(traitType)
@@ -995,13 +928,10 @@ SPAGMMATtest <- function(bgenFile = "",
     ## re-order the conditioning markers
     ## condition_original = unlist(strsplit(condition, ","))
     # condition_genoIndex=extract_genoIndex_condition(condition, objGeno$markerInfo, genoType)
-    print("condition_genoIndex")
-    print(condition_genoIndex)
 
     if (isGroupTest) {
       if (!is.null(weights_for_condition)) {
         condition_weights <- as.matrix(weights_for_condition)
-        print(condition_weights)
         # print(condition_genoIndex$cond_genoIndex)
         # condition_weights = as.numeric(unlist(strsplit(weights_for_condition, ",")))
         if (nrow(condition_weights) != length(condition_genoIndex$cond_genoIndex)) {
@@ -1036,17 +966,7 @@ SPAGMMATtest <- function(bgenFile = "",
     condition_genoIndex_prev_a <- as.character(format(condition_genoIndex$cond_genoIndex_prev, scientific = FALSE))
     # 	print("OKKK")
 
-    print("condition_genoIndex_prev_a")
-    print(condition_genoIndex_prev_a)
-    print("condition_genoIndex_a")
-    print(condition_genoIndex_a)
-    print("condition_weights")
-    print(condition_weights)
-    print("BetaDist_weight_mat")
-    print(BetaDist_weight_mat)
     BetaDist_weight_mat <- as.matrix(BetaDist_weight_mat)
-    print("BetaDist_weight_mat")
-    print(dim(BetaDist_weight_mat))
 
 
     assign_conditionMarkers_factors(genoType, condition_genoIndex_prev_a, condition_genoIndex_a, n, condition_weights, BetaDist_weight_mat, is_equal_weight_in_groupTest)
@@ -1156,9 +1076,7 @@ SPAGMMATtest <- function(bgenFile = "",
       MAFlimitMat <- rbind(MAFlimitMat, cbind(minMAC_in_groupTest_to_MAF, maxMAC_in_groupTest_to_MAF))
     } # if(length(maxMACbinind) > 0){
 
-    print(MAFlimitMat)
     MAFlimitMat <- MAFlimitMat[!duplicated(MAFlimitMat), , drop = F]
-    print(MAFlimitMat)
     MAFlimitMat <- MAFlimitMat[order(MAFlimitMat[, 2], MAFlimitMat[, 1]), , drop = F]
     minMAF_in_groupTest <- MAFlimitMat[, 1]
     maxMAF_in_groupTest <- MAFlimitMat[, 2]
@@ -1172,12 +1090,11 @@ SPAGMMATtest <- function(bgenFile = "",
     # method_to_CollapseUltraRare,
     # DosageCutoff_for_UltraRarePresence,
     if (r.corr == 0 & is_Firth_beta) {
-      print("WARNING: Note that the Firth correction has not been implemented for Burden test effect sizes when SKAT-O test is conducted. If the corrected Burden test effect sizes is needed, please use r.corr=1 to only conduct Burden test.")
+      cat("WARNING: Note that the Firth correction has not been implemented for Burden test effect sizes when SKAT-O test is conducted. If the corrected Burden test effect sizes is needed, please use r.corr=1 to only conduct Burden test.\n")
       if (is_single_in_groupTest) {
-        print("Firth correction will be used for effect sizes of single variant tests")
+        cat("Firth correction will be used for effect sizes of single variant tests\n")
       }
     }
-
     BetaDist_weight_mat <- matrix(c(0, 0), ncol = 2)
 
     if (!is.null(weights.beta)) {
@@ -1192,8 +1109,6 @@ SPAGMMATtest <- function(bgenFile = "",
       }
     }
 
-    print("condition_weights")
-    print(condition_weights)
 
     SAIGE.Region(
       mu,
