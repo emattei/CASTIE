@@ -1654,7 +1654,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         modglmm$obj.noK$XVX <- NULL
         modglmm$obj.noK$XXVX_inv <- NULL
         modglmm$obj.noK$XVX_inv <- NULL
-      } else {
+      } else if (!is.null(modglmm$X)) { # a null model slimmed before X was kept has only XV
         modglmm$obj.noK$XV <- NULL # ReadModel rebuilds both from X
         modglmm$obj.noK$XXVX_inv <- NULL
       }
