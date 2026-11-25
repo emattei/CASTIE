@@ -1559,11 +1559,15 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       if (verbose) cat(sprintf("[TIMING:PP] setgeno: %.2fs\n", (proc.time() - .t_pp_setgeno)[3]))
     }
   } else {
+    .t_post <- proc.time() # read by the post-processing timing line
     cat("Skip fitting the NULL GLMM\n")
     if (!file.exists(modelOut)) {
       stop("skipModelFitting=TRUE but ", modelOut, " does not exist\n")
     }
     load(modelOut)
+    if (!skipVarianceRatioEstimation && is.null(modglmm$linear.predictors)) {
+      stop("skipModelFitting=TRUE needs a null model saved with isShrinkModelOutput=FALSE to estimate variance ratios")
+    }
     if (is.null(modglmm$LOCO)) {
       modglmm$LOCO <- FALSE
     }
