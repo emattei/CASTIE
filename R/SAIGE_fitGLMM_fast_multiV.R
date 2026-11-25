@@ -135,14 +135,14 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   modelOut <- paste0(outputPrefix, ".rda")
 
   if (skipModelFitting) {
-    if (!file.exists(modelOut)) {
+    if (!castie_model_exists(modelOut)) {
       stop("skipModelFitting=TRUE but ", modelOut, " does not exist\n")
     }
   } else {
     if (LOCO & isLowMemLOCO) {
       modelOut <- paste(c(outputPrefix, "_noLOCO.rda"), collapse = "")
     }
-    file.create(modelOut, showWarnings = TRUE)
+    castie_reserve_model(modelOut)
   }
   if (plinkFile != "") {
     bimFile <- paste0(plinkFile, ".bim")
@@ -1529,8 +1529,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       modglmm$T_longl_vec <- dataMerge_sort$longlVar
       modglmmSaved <- modglmm # what load(modelOut) returns below, without writing it twice
       on.exit(if (!is.null(modglmmSaved)) { # stopped before the final save: leave this model on disk, as before
-        modglmm <- modglmmSaved
-        save(modglmm, file = modelOut, compress = FALSE)
+        castie_save_model(modglmmSaved, modelOut)
       }, add = TRUE)
     }
 
@@ -1561,10 +1560,10 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   } else {
     .t_post <- proc.time() # read by the post-processing timing line
     cat("Skip fitting the NULL GLMM\n")
-    if (!file.exists(modelOut)) {
+    if (!castie_model_exists(modelOut)) {
       stop("skipModelFitting=TRUE but ", modelOut, " does not exist\n")
     }
-    load(modelOut)
+    modglmm <- castie_load_model(modelOut)
     if (!skipVarianceRatioEstimation && is.null(modglmm$linear.predictors)) {
       stop("skipModelFitting=TRUE needs a null model saved with isShrinkModelOutput=FALSE to estimate variance ratios")
     }
@@ -1615,7 +1614,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       set_Diagof_StdGeno_LOCO()
     }
     cat("Start estimating variance ratios\n")
-    if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
+    modglmm <- if (is.null(modglmmSaved)) castie_load_model(modelOut) else modglmmSaved
     use_sandwich <- extractVarianceRatio_multiV(
       obj.glmm.null = modglmm,
       obj.glm.null = fit0, maxiterPCG = maxiterPCG,
@@ -1642,7 +1641,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   closeGenoFile_plink()
   # clean up saved model (as in ReadModel)
   if (isShrinkModelOutput) {
-    if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
+    modglmm <- if (is.null(modglmmSaved)) castie_load_model(modelOut) else modglmmSaved
     modglmm$use_sandwich <- use_sandwich
     modglmm$useGRMtoFitNULL <- useGRMtoFitNULL # step 2 uses this to decide whether closed-form GxE conditioning applies
     modglmm$Y <- NULL

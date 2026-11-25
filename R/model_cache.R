@@ -1,3 +1,4 @@
+# The null model store: only these functions save, load, check, rename or remove null models, keyed by path.
 .model_cache <- new.env(parent = emptyenv()) # options(CASTIE.cache = TRUE): the model last saved by castie_save_model
 
 .model_key <- function(file) {
@@ -26,3 +27,20 @@ castie_load_model <- function(file) {
   load(file, envir = e)
   e$modglmm
 }
+
+#' Whether a null model is stored at `file`. The empty file castie_reserve_model() leaves is not one.
+#' @param file the .rda path.
+#' @param reserved TRUE to also count the empty file castie_reserve_model() leaves.
+castie_model_exists <- function(file, reserved = FALSE) file.exists(file) && (reserved || file.size(file) > 0)
+
+#' Create the empty file a null model will be saved to, so an unwritable path warns before the fit.
+#' @param file the .rda path.
+castie_reserve_model <- function(file) file.create(file, showWarnings = TRUE)
+
+#' Move the null model at `from`, or the empty file reserved there, to `to`. Nothing happens if there is neither.
+#' @param from,to the .rda paths.
+castie_rename_model <- function(from, to) if (file.exists(from)) file.rename(from, to)
+
+#' Remove the null model at `file`, or the empty file reserved there.
+#' @param file the .rda path.
+castie_remove_model <- function(file) if (file.exists(file)) file.remove(file)
