@@ -582,7 +582,7 @@ SPAGMMATtest <- function(bgenFile = "",
     XVX_inv_XVsample <- as.matrix(data.table::rbindlist(XVX_inv_XVsample))
     Sigma_iXXSigma_iX <- as.matrix(data.table::rbindlist(Sigma_iXXSigma_iX))
   }
-  gc()
+  castie_gc()
 
 
   # print("dim(ratioVecList$ratioVec_sparse)")
@@ -887,7 +887,7 @@ SPAGMMATtest <- function(bgenFile = "",
   # }
 
   # rm(sparseSigmaRList)
-  gc()
+  castie_gc()
 
   # Handle permutation FAM file if provided
   if (is_permute_ginge && permute_ginge_fam_file != "") {
@@ -1077,7 +1077,7 @@ SPAGMMATtest <- function(bgenFile = "",
   mu <- as.vector(t(I_mat) %*% (obj.model$mu))
   isgxe <- obj.model$isgxe
   rm(obj.model)
-  gc()
+  castie_gc()
   # print(gc(v=T))
   # if(file.exists(SAIGEOutputFile)) {print("ok 0 file exist")}
 

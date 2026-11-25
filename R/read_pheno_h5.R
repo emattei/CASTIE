@@ -1,3 +1,5 @@
+.pheno_cache <- new.env(parent = emptyenv()) # read_pheno_h5, options(CASTIE.cache = TRUE)
+
 #' Read a phenotype HDF5 file produced by `convert_phenoFile_to_h5.R`.
 #'
 #' Reads metadata columns named in `checkColList` from /meta and one gene
@@ -19,20 +21,32 @@ read_pheno_h5 <- function(phenoFile, phenoCol, sampleIDColinphenoFile, checkColL
 
   metaNames <- names(h5[["meta"]])
   metaCols <- intersect(checkColList, metaNames)
-  data <- data.frame(lapply(metaCols, function(col) h5[["meta"]][[col]]$read()),
-    stringsAsFactors = FALSE
-  )
-  colnames(data) <- metaCols
+  # options(CASTIE.cache = TRUE) (step12_batch_qtl.R): the metadata, gene names and indptr are the same for
+  # every gene of a file, so they are read once per session; only the gene's counts are read each time.
+  key <- paste(normalizePath(phenoFile), file.mtime(phenoFile), paste(metaCols, collapse = ","))
+  if (isTRUE(getOption("CASTIE.cache")) && identical(.pheno_cache$key, key)) {
+    data <- .pheno_cache$data
+    geneNames <- .pheno_cache$geneNames
+    indptr_raw <- .pheno_cache$indptr
+  } else {
+    data <- data.frame(lapply(metaCols, function(col) h5[["meta"]][[col]]$read()),
+      stringsAsFactors = FALSE
+    )
+    colnames(data) <- metaCols
+    geneNames <- h5[["counts"]][["gene_names"]]$read()
+    ## indptr is stored as double to support nnz > 2^31; keep as numeric for
+    ## indexing (R doubles give 53-bit integers, ample for any realistic dataset)
+    indptr_raw <- h5[["counts"]][["indptr"]]$read()
+    if (isTRUE(getOption("CASTIE.cache"))) {
+      list2env(list(key = key, data = data, geneNames = geneNames, indptr = indptr_raw), envir = .pheno_cache)
+    }
+  }
 
-  geneNames <- h5[["counts"]][["gene_names"]]$read()
   geneIdx <- match(phenoCol, geneNames)
   if (is.na(geneIdx)) {
     stop("ERROR! phenoCol '", phenoCol, "' not found in HDF5 counts/gene_names\n")
   }
 
-  ## indptr is stored as double to support nnz > 2^31; keep as numeric for
-  ## indexing (R doubles give 53-bit integers, ample for any realistic dataset)
-  indptr_raw <- h5[["counts"]][["indptr"]]$read()
   ptr_start <- indptr_raw[geneIdx] + 1 # 0-based -> 1-based
   ptr_end <- indptr_raw[geneIdx + 1L]
   nrows <- nrow(data)

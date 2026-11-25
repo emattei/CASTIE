@@ -43,6 +43,8 @@ option_list <- list(
     help="Required. Column name of sample IDs in the phenotype file, e.g. IID"),
   make_option("--tol", type="numeric", default=0.02,
     help="Optional. Tolerance for fitting the null GLMM to converge [default=0.02]."),
+  make_option("--tauZeroCutoff", type="numeric", default=NA,
+    help="Optional. Variance components below this are set to 0 while fitting. Default: the value of --tol, which then sets both convergence and this cutoff."),
   make_option("--maxiter", type="integer", default=500,
     help="Optional. Maximum number of iterations used to fit the null GLMM [default=20]."),
   make_option("--tolPCG", type="numeric", default=1e-5,
@@ -63,6 +65,12 @@ option_list <- list(
    help="Optional. Size (Gb) for each memory chunk [default=2]"),
   make_option("--perContextTau", type="logical", default=FALSE,
    help="Optional. Fit one random-slope variance per dynamic covariate. Needs useGRMtoFitNULL=FALSE [default=FALSE]"),
+  make_option("--exactTrace", type="logical", default=FALSE,
+   help="Optional. Exact variance-component traces from the donor-block structure instead of random vectors. Needs dynamic covariates, repeated cells per donor, useGRMtoFitNULL=FALSE and traitType binary or count [default=FALSE]"),
+  make_option("--activeSetAI", type="logical", default=FALSE,
+   help="Optional. In the AI-REML step, variance components at 0 whose score points below 0 stay at 0 and leave the system [default=FALSE]"),
+  make_option("--tolEta", type="numeric", default=Inf,
+   help="Optional. The inner fixed-effect loop also requires max |change in the linear predictor| < tolEta, random effects included [default=Inf: only the 10% test on the fixed effects]"),
   make_option("--tauInit", type="character", default="0,0",
    help="Optional. Initial values for tau. Dynamic models given fewer than 3 values use 1,0.1,0. [default=0,0]"),
   make_option("--LOCO", type="logical", default=TRUE,
@@ -154,7 +162,7 @@ option_list <- list(
 
 ## list of options
 parser <- OptionParser(usage="%prog [options]", option_list=option_list)
-args <- parse_args(parser, positional_arguments = 0)
+args <- parse_args(parser, args = getOption("CASTIE.args", commandArgs(trailingOnly = TRUE)), positional_arguments = 0)  # step12_batch_qtl.R sets CASTIE.args
 opt <- args$options
 
 ## Fix: empty-string values for logical options (happens when shell vars are unset)
@@ -395,7 +403,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
             invNormalize = opt$invNormalize,
             covarColList = covars,
             qCovarCol = qcovars,
-            tol=opt$tol,
+            tol=opt$tol, tauZeroCutoff=opt$tauZeroCutoff,
             maxiter=opt$maxiter,
             tolPCG=opt$tolPCG,
             maxiterPCG=opt$maxiterPCG,
@@ -440,7 +448,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
       verbose=opt$verbose,
       eCovarCol=ecovars,
-      perContextTau=opt$perContextTau
+      perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta
         )
 
 
@@ -450,9 +458,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
 #}) 
 
 
-  my_env = new.env()
-  load(paste0(outputprefixsubset, ".rda"), envir = my_env)
-  modglmm = my_env$modglmm
+  modglmm = castie_load_model(paste0(outputprefixsubset, ".rda"))
   print(modglmm$theta)
 
 if(!opt$isCovariateOffset){
@@ -481,7 +487,7 @@ if(!opt$isCovariateOffset){
               invNormalize = opt$invNormalize,
               covarColList = covars,
               qCovarCol = qcovars,
-              tol=opt$tol,
+              tol=opt$tol, tauZeroCutoff=opt$tauZeroCutoff,
               maxiter=opt$maxiter,
               tolPCG=opt$tolPCG,
               maxiterPCG=opt$maxiterPCG,
@@ -526,7 +532,7 @@ if(!opt$isCovariateOffset){
               smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
               verbose=opt$verbose,
               eCovarCol=ecovars,
-              perContextTau=opt$perContextTau
+              perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta
           )
           TRUE
         }, error = function(e) {
@@ -578,7 +584,7 @@ if(!opt$isCovariateOffset){
               invNormalize = opt$invNormalize,
               covarColList = covars,
               qCovarCol = qcovars,
-              tol=opt$tol,
+              tol=opt$tol, tauZeroCutoff=opt$tauZeroCutoff,
               maxiter=opt$maxiter,
               tolPCG=opt$tolPCG,
               maxiterPCG=opt$maxiterPCG,
@@ -623,7 +629,7 @@ if(!opt$isCovariateOffset){
               smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
               verbose=opt$verbose,
               eCovarCol=ecovars,
-              perContextTau=opt$perContextTau
+              perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta
           )
           my_env = new.env()
           load(paste0(outputprefixsubset, ".offset.rda"), envir = my_env)
@@ -718,7 +724,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
             invNormalize = opt$invNormalize,
             covarColList = covars,
             qCovarCol = qcovars,
-	    tol=opt$tol,
+	    tol=opt$tol, tauZeroCutoff=opt$tauZeroCutoff,
 	    maxiter=opt$maxiter,
             tolPCG=opt$tolPCG,
             maxiterPCG=opt$maxiterPCG,
@@ -763,7 +769,7 @@ fitNULLGLMM_multiV(plinkFile=opt$plinkFile,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB,
       verbose=opt$verbose,
       eCovarCol=ecovars,
-      perContextTau=opt$perContextTau
+      perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta
 	)
 
 }, error = function(e) {
@@ -799,7 +805,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
       useSparseGRMforVarRatio=opt$useSparseGRMforVarRatio,
       invNormalize=opt$invNormalize,
       covarColList=covars, qCovarCol=qcovars,
-      tol=opt$tol, maxiter=opt$maxiter,
+      tol=opt$tol, tauZeroCutoff=opt$tauZeroCutoff, maxiter=opt$maxiter,
       tolPCG=opt$tolPCG, maxiterPCG=opt$maxiterPCG,
       SPAcutoff=opt$SPAcutoff,
       numMarkersForVarRatio=opt$numRandomMarkerforVarianceRatio,
@@ -828,7 +834,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
       longlCol=opt$longlCol, useGRMtoFitNULL=opt$useGRMtoFitNULL,
       offsetCol=opt$offsetCol, varWeightsCol=opt$varWeightsCol,
       sampleCovarCol=scovars, isStoreSigma=opt$isStoreSigma,
-      isShrinkModelOutput=opt$isShrinkModelOutput, eCovarCol=ecovars, perContextTau=opt$perContextTau,
+      isShrinkModelOutput=opt$isShrinkModelOutput, eCovarCol=ecovars, perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta,
       smwCacheMemLimitMB=opt$smwCacheMemLimitMB, verbose=opt$verbose
     ),
     error = function(e) { cat("Fit failed:", e$message, "\n"); NULL }
@@ -840,10 +846,9 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
 .thetaOK <- function(suffix) {
   rda <- paste0(opt$outputPrefix, suffix, ".rda")
   if (!file.exists(rda) || file.size(rda) == 0) return(FALSE)
-  e <- new.env()
-  ok <- tryCatch({ load(rda, envir = e); TRUE }, error = function(e) FALSE)
-  if (!ok) return(FALSE)
-  m <- e$modglmm; print(m$theta)
+  m <- tryCatch(castie_load_model(rda), error = function(e) FALSE) # the in-memory model when it is the one just saved
+  if (isFALSE(m)) return(FALSE)
+  print(m$theta)
   !is.null(m$theta) &&
     !(sum(m$theta[2:length(m$theta)]) < 0 || sum(m$theta[2:length(m$theta)]) >10)
 }
@@ -1003,9 +1008,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
   m                   <- NULL  # always defined so rescue block is safe
 
   if (file.exists(model_file) && file.size(model_file) > 0) {
-    tmp_env <- new.env()
-    load(model_file, envir = tmp_env)
-    m <- tmp_env$modglmm
+    m <- castie_load_model(model_file)
     theta_vals <- m$theta
     converged  <- isTRUE(m$converged)
     if (!is.null(m$isCovariateOffset)) is_cov_offset_final <- m$isCovariateOffset
@@ -1025,8 +1028,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
   if (!overall_ok && !all_failed && !is.null(m) && !is.null(m$use_sandwich)) {
     m$use_sandwich <- rep(TRUE, length(m$use_sandwich))
     if (!is.null(m$eMatIsSample)) m$use_sandwich[m$eMatIsSample] <- FALSE
-    modglmm <- m
-    save(modglmm, file=model_file)
+    castie_save_model(m, model_file)
     use_sandwich <- m$use_sandwich  # keep local var in sync with what was saved
   }
 

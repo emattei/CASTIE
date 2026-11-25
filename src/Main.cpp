@@ -72,6 +72,8 @@ arma::uvec g_covarianceidxMat_col3;
 arma::uvec g_covarianceidxMat_notcol1;
 arma::fmat g_EMat;
 bool g_perContextTau = false;  // tau = (tau0, tau1, one slope tau per E column)
+bool g_exactTrace = false;     // GetTrace_multiV_eMat: exact donor-block traces instead of random vectors
+bool g_activeSetAI = false;    // AI step: components at 0 with a negative score stay at 0 (see aiStep)
 arma::fvec  g_EEt_eigenvalVec;
 arma::fvec g_EEt_diagVec;
 arma::fmat g_EEt_eigenvecMat;
@@ -1407,6 +1409,7 @@ void setPLINKobjInCPP(std::string t_bimFile,
                       std::vector<std::string> & t_SampleInModel,
                       std::string t_AlleleOrder)
 {
+  delete ptr_gPLINKobj; // the previous gene's object: a session can run many genes
   ptr_gPLINKobj = new PLINK::PlinkClass(t_bimFile,
                                         t_famFile,
                                         t_bedFile,
@@ -1513,6 +1516,7 @@ void setSAIGEobjInCPP(arma::mat & t_XVX,
 {
 	//t_SigmaMat_sp.print("t_SigmaMat_sp");
   // check SAIGE.cpp
+  delete ptr_gSAIGEobj; // the previous gene's object (~70 MB of N x p matrices)
   ptr_gSAIGEobj = new SAIGE::SAIGEClass(
 	t_XVX,
         t_XXVX_inv,
@@ -4529,6 +4533,29 @@ arma::fvec slopeTauVec(arma::fvec & tauVec){
 	return v;
 }
 
+// [[Rcpp::export]]
+void set_activeSetAI(bool t_activeSetAI){
+	g_activeSetAI = t_activeSetAI;
+}
+
+// AI-REML step Dtau = AI^-1 score over the free components. With activeSetAI, components at 0 whose score
+// points below 0 leave the system and stay at 0, so their scores do not pull the others away from the
+// constrained REML optimum (scores 0 for components > 0, <= 0 for components at 0).
+arma::fvec aiStep(arma::fmat& AI1, arma::fvec& score1, arma::fvec tau0_free){
+	arma::fvec Dtau(AI1.n_cols, arma::fill::zeros);
+	arma::uvec act = arma::regspace<arma::uvec>(0, AI1.n_cols - 1);
+	if(g_activeSetAI) act = arma::find((tau0_free > 0) + (score1 > 0));
+	if(act.n_elem == 0) return Dtau;
+	try{
+		Dtau.elem(act) = arma::solve(AI1.submat(act, act), score1.elem(act), arma::solve_opts::allow_ugly);
+	}
+	catch(std::runtime_error&){
+		std::cout << "arma::solve(AI, score): AI seems singular, using less variant components matrix is suggested." << std::endl;
+		Dtau.zeros();
+	}
+	return Dtau;
+}
+
 // Donor-blocked kernel of E column j: e_j % (I I^T (e_j % b))
 arma::fvec eKernel(arma::fvec & bVec, unsigned int j){
 	arma::fvec e = g_EMat.col(j);
@@ -5650,13 +5677,7 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         arma::fmat AI1 = re["AI"];
         arma::fvec Dtau(AI1.n_cols);
         score1.print("score");
-        try{
-                Dtau = arma::solve(AI1, score1, arma::solve_opts::allow_ugly);
-        }
-        catch(std::runtime_error){
-                std::cout << "arma::solve(AI, score): AI seems singular, using less variant components matrix is suggested." << std::endl;
-                Dtau.zeros();
-        }
+        Dtau = aiStep(AI1, score1, tauVec.elem(idxtau));
         arma::fvec Dtau_k1(k1);
         Dtau_k1.zeros();
 
@@ -6492,6 +6513,83 @@ arma::fvec GetTrace_multiV(arma::fmat Sigma_iX, arma::fmat& Xmat, arma::fvec& wV
 
 
 
+// Sigma^-1 B, column by column, when getPCG1ofSigmaAndVector_multiV would take the individual-level Woodbury
+// path (Case 2). The per-donor setup does not depend on the right-hand side, so it is done once for all the
+// columns instead of once per column; the per-column arithmetic is that of getPCG1ofSigmaAndVector_multiV, so
+// every column is the same to the bit.
+static bool sigmaInvCase2Applies(arma::fvec& tauVec, int Nnomissing) {
+  return !g_isStoreSigma && !g_usePCG && g_EMat.n_rows == (arma::uword)Nnomissing &&
+         g_EMat.n_cols != (arma::uword)Nnomissing && g_EMat.n_cols < 100 && tauVec.n_elem >= 3 &&
+         arma::any(slopeTauVec(tauVec) != 0);
+}
+
+static arma::fmat getSigmaInvMat_case2(arma::fvec& wVec, arma::fvec& tauVec, const arma::fmat& Bmat) {
+  int k = g_EMat.n_cols;
+  arma::fmat xMat(Bmat.n_rows, Bmat.n_cols);
+  auto n_individuals = g_I_start_indices.n_elem - 1;
+  float inv_tau0 = 1.0f / tauVec(0);
+  float tau1 = tauVec(1);
+  arma::frowvec sqrt_tau2 = arma::sqrt(slopeTauVec(tauVec)).t();
+
+#ifdef _OPENMP
+  omp_set_num_threads(g_omp_num_threads);
+  #pragma omp parallel for schedule(static)
+#endif
+  for (size_t j = 0; j < n_individuals; j++) {
+    size_t start = g_I_start_indices[j];
+    size_t end = g_I_start_indices[j+1];
+    int cells_in_individual = end - start;
+    if (cells_in_individual == 0) continue;
+
+    arma::fvec w_ind = wVec.subvec(start, end-1);
+    arma::fmat E_ind = g_EMat.rows(start, end-1).t();
+    arma::fvec w_inv_tau0 = w_ind * inv_tau0;
+    float sum_w = arma::sum(w_ind);
+
+    arma::fmat U_ind = E_ind.t();
+    U_ind.each_row() %= sqrt_tau2;
+    arma::fmat A_inv_U_ind(cells_in_individual, k);
+    if (tau1 == 0) {
+      for (int covar = 0; covar < k; covar++) {
+        A_inv_U_ind.col(covar) = w_inv_tau0 % U_ind.col(covar);
+      }
+    } else {
+      float denominator = 1 + tau1 * (sum_w * inv_tau0);
+      float factor = (tau1 * inv_tau0) * inv_tau0 / denominator;
+      for (int covar = 0; covar < k; covar++) {
+        arma::fvec u_col = U_ind.col(covar);
+        float sum_wu = arma::sum(w_ind % u_col);
+        A_inv_U_ind.col(covar) = w_inv_tau0 % u_col - (factor * sum_wu) * w_inv_tau0;
+      }
+    }
+    arma::fmat VT_A_inv_U = U_ind.t() * A_inv_U_ind;
+    arma::fmat I_k = arma::eye<arma::fmat>(k, k);
+    arma::fmat middle_inv;
+    try {
+      middle_inv = arma::inv(I_k + VT_A_inv_U);
+    } catch (...) {
+      middle_inv = arma::pinv(I_k + VT_A_inv_U);
+    }
+
+    for (arma::uword c = 0; c < Bmat.n_cols; c++) {
+      arma::fvec b_ind = Bmat.col(c).subvec(start, end-1);
+      arma::fvec x_base_ind(cells_in_individual);
+      if (tau1 == 0) {
+        x_base_ind = w_inv_tau0 % b_ind;
+      } else {
+        float sum_wb = arma::sum(w_ind % b_ind);
+        float denominator = 1 + tau1 * (sum_w * inv_tau0);
+        float correction_factor = (tau1 * inv_tau0) * (sum_wb * inv_tau0) / denominator;
+        x_base_ind = w_inv_tau0 % b_ind - correction_factor * w_inv_tau0;
+      }
+      arma::fvec correction_ind = A_inv_U_ind * (middle_inv * (U_ind.t() * x_base_ind));
+      xMat.col(c).subvec(start, end-1) = x_base_ind - correction_ind;
+    }
+  }
+  return xMat;
+}
+
+
 // [[Rcpp::export]]
 Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec& wVec,  arma::fvec& tauVec, int maxiterPCG, float tolPCG, bool LOCO){
 
@@ -6499,18 +6597,24 @@ Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec
         arma::fvec Sigma_iY;
 	std::cout << "before Sigma_iY" << std::endl;
 	std::cout << "Yvec.n_elem " << Yvec.n_elem << std::endl;
-        Sigma_iY = getPCG1ofSigmaAndVector_multiV(wVec, tauVec, Yvec, maxiterPCG, tolPCG, LOCO);
-        std::cout << "after Sigma_iY" << std::endl;
         int colNumX = Xmat.n_cols;
         arma::fmat Sigma_iX(Nnomissing,colNumX);
+        if (sigmaInvCase2Applies(tauVec, Nnomissing)) { // Sigma^-1 [Y, X] with one Woodbury setup per donor
+          arma::fmat Sigma_iYX = getSigmaInvMat_case2(wVec, tauVec, arma::join_rows(Yvec, Xmat));
+          Sigma_iY = Sigma_iYX.col(0);
+          Sigma_iX = Sigma_iYX.cols(1, colNumX);
+          std::cout << "after Sigma_iY" << std::endl;
+        } else {
+        Sigma_iY = getPCG1ofSigmaAndVector_multiV(wVec, tauVec, Yvec, maxiterPCG, tolPCG, LOCO);
+        std::cout << "after Sigma_iY" << std::endl;
         arma::fvec XmatVecTemp;
         for(int i = 0; i < colNumX; i++){
                 XmatVecTemp = Xmat.col(i);
                 Sigma_iX.col(i) = getPCG1ofSigmaAndVector_multiV(wVec, tauVec, XmatVecTemp, maxiterPCG, tolPCG, LOCO);
 
         }
+        }
         arma::fmat Xmatt = Xmat.t();
-        //arma::fmat cov = inv_sympd(Xmatt * Sigma_iX);
         arma::fmat cov;
         try {
           cov = arma::inv_sympd(arma::symmatu(Xmatt * Sigma_iX));
@@ -6518,10 +6622,8 @@ Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec
           cov = arma::pinv(arma::symmatu(Xmatt * Sigma_iX));
           cout << "inv_sympd failed, inverted with pinv" << endl;
         }
-	cov.print("cov"); 	
+        // (the 31 x 31 cov was printed here on every call: ~45 times per gene)
         arma::fmat Sigma_iXt = Sigma_iX.t();
-	//Sigma_iXt.print("Sigma_iXt");
-	//Yvec.print("Yvec");
         arma::fvec SigmaiXtY = Sigma_iXt * Yvec;
         arma::fvec alpha = cov * SigmaiXtY;
 	
@@ -8033,6 +8135,7 @@ void  parallelsumTwoVec(arma::fvec &x) {
 
 // [[Rcpp::export]]
 void setgenoNULL(){
+	delete ptr_gNULLGENOobj; // the previous gene's object
 	ptr_gNULLGENOobj = new NullGENO::NullGenoClass();
 }
 // [[Rcpp::export]]
@@ -9265,13 +9368,7 @@ int nrun, int maxiterPCG, float tolPCG, float tol, float traceCVcutoff, bool LOC
         arma::fmat AI1 = re["AI"];
         arma::fvec Dtau(AI1.n_cols);
         score1.print("score");
-        try{
-                Dtau = arma::solve(AI1, score1, arma::solve_opts::allow_ugly);
-        }
-        catch(std::runtime_error){
-                std::cout << "arma::solve(AI, score): AI seems singular, using less variant components matrix is suggested." << std::endl;
-                Dtau.zeros();
-        }
+        Dtau = aiStep(AI1, score1, tauVec.elem(idxtau));
         arma::fvec Dtau_k1(k1);
         Dtau_k1.zeros();
 
@@ -9670,7 +9767,57 @@ double trace_EE_P() {
 
 
 // [[Rcpp::export]]
+void set_exactTrace(bool t_exactTrace){
+	g_exactTrace = t_exactTrace;
+}
+
+// Exact tr(P K_k) for the donor-blocked kernels of a model without GRM: K_1 = I I^T (donor intercept) and
+// diag(e_j) I I^T diag(e_j) per E column (eKernel; summed when one slope variance is shared).
+// Within donor d, Sigma_d = diag(tau0 / w) + U_d G U_d^T with U = [1, E], G = diag(tau1, slope taus).
+// With A_d = U_d^T W_d U_d (W = w / tau0): tr(Sigma^-1 Z_a Z_a^T) = sum_d [A_d (I + G A_d)^-1]_aa, valid
+// also when some taus are 0; tr(P Z_a Z_a^T) subtracts tr(M_a cov M_a^T), M_a = Z_a^T Sigma^-1 X.
+arma::fvec exactTrace_multiV_eMat(arma::fmat& Sigma_iX, arma::fvec& wVec, arma::fvec& tauVec, arma::ivec& fixtauVec, arma::fmat& cov1){
+	if(g_isGRM || g_I_longl_mat.n_rows == 0 || g_T_longl_mat.n_rows > 0 || g_covarianceidxMat.n_rows > 0 || fixtauVec(0) == 0){
+		Rcpp::stop("exactTrace needs repeated samples (I_longl) without GRM, longlCol or covariance terms, and a fixed tau0");
+	}
+	unsigned int n = wVec.n_elem, C = g_EMat.n_cols, K = 1 + C, D = g_I_longl_mat.n_cols;
+	arma::uvec donor(n);
+	for(arma::sp_fmat::const_iterator it = g_I_longl_mat.begin(); it != g_I_longl_mat.end(); ++it) donor(it.row()) = it.col();
+	arma::mat U(n, K);
+	U.col(0).ones();
+	U.cols(1, C) = arma::conv_to<arma::mat>::from(g_EMat);
+	arma::vec w = arma::conv_to<arma::vec>::from(wVec) / tauVec(0);
+	arma::vec g(K);
+	g(0) = tauVec(1);
+	g.subvec(1, C) = arma::conv_to<arma::vec>::from(slopeTauVec(tauVec));
+
+	arma::cube A(K, K, D, arma::fill::zeros);
+	for(unsigned int i = 0; i < n; i++) A.slice(donor(i)) += w(i) * (U.row(i).t() * U.row(i));
+	arma::vec t(K, arma::fill::zeros);
+	arma::mat G = arma::diagmat(g), IK = arma::eye(K, K);
+	for(unsigned int d = 0; d < D; d++) t += arma::diagvec(A.slice(d) * arma::inv(IK + G * A.slice(d)));
+
+	arma::mat SX = arma::conv_to<arma::mat>::from(Sigma_iX), cv = arma::conv_to<arma::mat>::from(cov1);
+	for(unsigned int a = 0; a < K; a++){
+		arma::mat M(D, SX.n_cols, arma::fill::zeros);
+		for(unsigned int i = 0; i < n; i++) M.row(donor(i)) += U(i, a) * SX.row(i);
+		t(a) -= arma::accu((M * cv) % M);
+	}
+
+	arma::fvec full(g_num_Kmat, arma::fill::zeros);
+	full(1) = t(0);
+	if(g_perContextTau){
+		for(unsigned int j = 0; j < C; j++) full(2 + j) = t(1 + j);
+	}else{
+		full(2) = arma::accu(t.subvec(1, C));
+	}
+	return full.elem(arma::find(fixtauVec == 0));
+}
+
+// [[Rcpp::export]]
 arma::fvec GetTrace_multiV_eMat(arma::fmat Sigma_iX, arma::fmat& Xmat, arma::fvec& wVec, arma::fvec& tauVec, arma::ivec & fixtauVec, arma::fmat& cov1,  int nrun, int maxiterPCG, float tolPCG, float traceCVcutoff, bool LOCO){
+
+        if(g_exactTrace) return exactTrace_multiV_eMat(Sigma_iX, wVec, tauVec, fixtauVec, cov1);
 
         set_seed(200);
 

@@ -203,7 +203,7 @@ SAIGE.Marker <- function(
     # print(timeoutput)
     ptm <- proc.time()
     print(ptm)
-    gc()
+    castie_gc()
     # rm(resMarker)
 
 

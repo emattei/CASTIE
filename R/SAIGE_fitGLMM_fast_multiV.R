@@ -10,6 +10,7 @@
 #' @param eCovarCol vector of characters. Covariates of environmental factors/cell context to be used in the null model. All covariates listed in eCovarCol must be also in covarColList,  e,g c("cellType").
 #' @param sampleIDColinphenoFile character. Column name for the sample IDs in the phenotype file e.g. "IID".
 #' @param tol numeric. The tolerance for fitting the null model to converge. By default, 0.02.
+#' @param tauZeroCutoff numeric. Variance components below this are set to 0 while fitting. NA (default) uses tol, the original behaviour, which ties the cutoff to the convergence tolerance. Not used by traitType = "count_nb".
 #' @param maxiter integer. The maximum number of iterations used to fit the null GLMMM. By default, 20.
 #' @param tolPCG numeric. The tolerance for PCG to converge. By default, 1e-5.
 #' @param maxiterPCG integer. The maximum number of iterations for PCG. By default, 500.
@@ -49,6 +50,12 @@
 #' @param isShrinkModelOutput logical. remove unnecessary objects for step2 from the model output. By default, FALSE.
 #' @param perContextTau logical. Fit one random-slope variance per column of eCovarCol, not one shared value.
 #'   By default, FALSE.
+#' @param exactTrace logical. Exact variance-component traces from the donor-block structure instead of random
+#'   vectors (dynamic covariates, repeated cells per donor, no GRM, binary or count traits). By default, FALSE.
+#' @param activeSetAI logical. In the AI-REML step, variance components at 0 whose score points below 0 stay at 0
+#'   and leave the system, so they do not pull the other components. By default, FALSE.
+#' @param tolEta numeric. The inner fixed-effect loop also requires max |change in the linear predictor| < tolEta
+#'   (random effects included). By default, Inf (only the 10% test on the fixed effects).
 #' @return a file ended with .rda that contains the glmm model information, a file ended with .varianceRatio.txt that contains the variance ratio values, and a file ended with #markers.SPAOut.txt that contains the SPAGMMAT tests results for the markers used for estimating the variance ratio.
 #' @export
 fitNULLGLMM_multiV <- function(plinkFile = "",
@@ -69,6 +76,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
                                longlCol = "",
                                sampleIDColinphenoFile = "",
                                tol = 0.02,
+                               tauZeroCutoff = NA,
                                maxiter = 20,
                                tolPCG = 1e-5,
                                maxiterPCG = 500,
@@ -119,6 +127,9 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
                                isShrinkModelOutput = FALSE,
                                smwCacheMemLimitMB = NULL,
                                perContextTau = FALSE,
+                               exactTrace = FALSE,
+                               activeSetAI = FALSE,
+                               tolEta = Inf,
                                verbose = FALSE) {
   ## set up output files
   modelOut <- paste0(outputPrefix, ".rda")
@@ -351,6 +362,17 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     }
   }
   .t0_total <- proc.time()
+  # options(CASTIE.fastGLM = TRUE): every glm() below fits with castie_glm_fit (glm.fit with Cholesky solves)
+  # (the caller's own call is re-evaluated, so glm()'s match.call and model.frame see the original arguments)
+  if (isTRUE(getOption("CASTIE.fastGLM"))) {
+    glm <- function(...) {
+      cl <- match.call()
+      cl[[1L]] <- quote(stats::glm)
+      cl$method <- quote(castie_glm_fit)
+      eval(cl, parent.frame())
+    }
+  }
+  modglmmSaved <- NULL # the model as last saved to modelOut, when it is still in memory
 
   if (!file.exists(phenoFile)) {
     stop("ERROR! phenoFile ", phenoFile, " does not exsit\n")
@@ -568,6 +590,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     cat("formula is ", formula, "\n")
     formula.null <- as.formula(formula)
     mmat <- model.matrix(formula.null, data, na.action = NULL)
+    rownames(mmat) <- NULL # its "1".."N" row names make data.frame() and merge() ~50x slower; merge() drops them
     mmat <- data.frame(mmat)
     mmat <- cbind(mmat, data[, which(colnames(data) == phenoCol), drop = F])
     colnames(mmat)[ncol(mmat)] <- phenoCol
@@ -637,7 +660,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
     if (!is.null(sampleListwithGeno)) {
       dataMerge <- merge(mmat_nomissing, sampleListwithGeno,
-        by.x = "IID", by.y = "IIDgeno"
+        by.x = "IID", by.y = "IIDgeno", sort = FALSE # the stable order(IndexGeno) below fixes the row order either way
       )
       dataMerge_sort <- dataMerge[with(dataMerge, order(IndexGeno)), ]
       # dataMerge_sort = dataMerge[with(dataMerge, order(IndexPheno)),]
@@ -685,7 +708,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
     rm(mmat)
     rm(mmat_nomissing)
-    gc()
+    castie_gc()
     isSparseGRMIdentity <- FALSE
     if (!is.null(sampleListwithGeno)) {
       indicatorGenoSamplesWithPheno <- (sampleListwithGeno$IndexGeno %in% dataMerge_sort$IndexGeno)
@@ -781,7 +804,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     formulaNewList <- paste0(formulaNewList, collapse = "")
     formulaNewList <- paste0(formulaNewList, "-1")
     formula.new <- as.formula(paste0(formulaNewList, collapse = ""))
-    data.new <- data.frame(cbind(out.transform$Y, out.transform$X1))
+    data.new <- data.frame(unname(cbind(out.transform$Y, out.transform$X1))) # no "1".."N" row names (slow); names set below
     colnames(data.new) <- c(phenoCol, out.transform$Param.transform$X_name)
     cat("colnames(data.new) is ", colnames(data.new), "\n")
     cat(
@@ -799,7 +822,9 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     out.transform <- NULL
   }
 
-  if (traitType == "binary") {
+  if (!isCovariateOffset) {
+    # modwitcov is only used for the covariate offset; otherwise it is the same glm as fit0 below
+  } else if (traitType == "binary") {
     if (length(offsetCol) == 0) {
       modwitcov <- glm(formula.new,
         data = data.new,
@@ -887,7 +912,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     # setupSparseGRM(dim(m4)[1], locationMatinR, valueVecinR)
     # setupSparseGRM_new(sparseGRMtest)
     # rm(sparseGRMtest)
-    gc()
+    castie_gc()
   }
 
   # allow for multiple variance components
@@ -957,6 +982,16 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     if (length(tauInit) != num_Kmat) tauInit <- c(1, 0.1, rep(0, ncol(eMat)))
   }
   set_perContextTau(perContextTau)
+  if (exactTrace && (is.null(eMat) || !any(duplicated(dataMerge_sort$IID)) || useGRMtoFitNULL || numofV > 0 ||
+    longlCol != "" || !(traitType %in% c("binary", "count")))) {
+    stop(
+      "exactTrace=TRUE needs dynamic covariates, repeated cells per donor, useGRMtoFitNULL=FALSE, ",
+      "no Vmat files, no longlCol and traitType binary or count\n"
+    )
+  }
+  set_exactTrace(exactTrace)
+  set_activeSetAI(activeSetAI)
+  options(CASTIE.tolEta = tolEta) # read by Get_Coef_multiV
   k <- num_Kmat
 
 
@@ -1030,7 +1065,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = binomial, weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1055,7 +1090,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = gaussian(link = "identity"), weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1097,7 +1132,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = "poisson", weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1134,7 +1169,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       fit0orig <- glm(formula.new.withCov, data = data.new, family = NegBin(), weights = varWeights)
       Xorig <- model.matrix(fit0orig)
       rm(fit0orig)
-      gc()
+      castie_gc()
       if (length(offsetCol) == 0) {
         fit0 <- glm(formula.new,
           data = data.new, offset = covoffset,
@@ -1179,12 +1214,13 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     set_isSparseGRM(useSparseGRMtoFitNULL)
     set_useGRMtoFitNULL(useGRMtoFitNULL)
 
+    if (is.na(tauZeroCutoff)) tauZeroCutoff <- tol  # original behaviour: tol is both the convergence tolerance and the zeroing cutoff
     if (traitType != "count_nb") {
       if (length(eCovarCol) == 0) {
-        system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
+        system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
           tau = tau, fixtau = fixtau, maxiter = maxiter,
-          tol = tol, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
+          tol = tol, tauZeroCutoff = tauZeroCutoff, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
           maxiterPCG = maxiterPCG, subPheno = dataMerge_sort, indicatorGenoSamplesWithPheno = indicatorGenoSamplesWithPheno,
           obj.noK = obj.noK, out.transform = out.transform,
           tauInit = tauInit, memoryChunk = memoryChunk,
@@ -1199,10 +1235,10 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         print("glmmkin.ai_PCG_Rcpp_multiV_eMat")
         print(fit0)
 
-        system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV_eMat(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
+        system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV_eMat(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
           fit0,
           tau = tau, fixtau = fixtau, maxiter = maxiter,
-          tol = tol, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
+          tol = tol, tauZeroCutoff = tauZeroCutoff, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
           maxiterPCG = maxiterPCG, subPheno = dataMerge_sort, indicatorGenoSamplesWithPheno = indicatorGenoSamplesWithPheno,
           obj.noK = obj.noK, out.transform = out.transform,
           tauInit = tauInit, memoryChunk = memoryChunk,
@@ -1219,7 +1255,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       cat(sprintf("[TIMING] AIREML null model fitting: %.1fs\n", (proc.time() - t_begin)[3]))
       .report_mem("after AIREML null model fitting")
     } else {
-      system.time(modglmm <- glmmkin.ai_PCG_Rcpp_multiV_NB(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
+      system.time(gcFirst = isTRUE(getOption("CASTIE.gc", TRUE)), expr = modglmm <- glmmkin.ai_PCG_Rcpp_multiV_NB(bedFile, bimFile, famFile, Xorig, isCovariateOffset,
         fit0,
         tau = tau, fixtau = fixtau, maxiter = maxiter,
         tol = tol, verbose = TRUE, nrun = nrun, tolPCG = tolPCG,
@@ -1247,7 +1283,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
         fit0orig <- glm(formula.new.withCov, data = data.new, family = gaussian(link = "identity"), weights = varWeights)
         Xorig <- model.matrix(fit0orig)
         rm(fit0orig)
-        gc()
+        castie_gc()
         if (length(offsetCol) == 0) {
           fit0 <- glm(formula.new,
             data = data.new, offset = covoffset,
@@ -1440,7 +1476,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       modglmm$chromosomeStartIndexVec <- NULL
       modglmm$chromosomeEndIndexVec <- NULL
       modelOut <- paste(c(outputPrefix, "_noLOCO.rda"), collapse = "")
-      save(modglmm, file = modelOut)
+      save(modglmm, file = modelOut, compress = FALSE)
       modglmm$LOCO <- TRUE
       modglmm$Y <- NULL
       eta0 <- modglmm$linear.predictors
@@ -1453,7 +1489,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       offset0 <- modglmm$offset
       modglmm$offset <- NULL
       y <- fit0$y
-      gc()
+      castie_gc()
       # save(modglmm, file = modelOut)
       set_Diagof_StdGeno_LOCO()
       modglmm$LOCOResult <- list()
@@ -1508,14 +1544,14 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
               modglmm$LOCOResult[[j1]] <- list(NULL)
             }
           }
-          save(modglmm, file = modelOutbychr)
+          save(modglmm, file = modelOutbychr, compress = FALSE)
           modglmm$LOCOResult[[j]] <- list(NULL)
-          gc()
+          castie_gc()
         } else {
           modglmm$LOCOResult[[j]] <- list(isLOCO = FALSE)
         }
       }
-      gc()
+      castie_gc()
       # modelOut_nonauto = paste(c(outputPrefix,"_noLOCO.rda"), collapse="")
     } else {
       # b = as.numeric(factor(dataMerge_sort$IID, levels =  unique(dataMerge_sort$IID)))
@@ -1526,7 +1562,8 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       # modglmm$T_longl_mat = I_mat * (dataMerge_sort$longlVar)
       modglmm$T_longl_vec <- dataMerge_sort$longlVar
       .t_pp_save <- proc.time()
-      save(modglmm, file = modelOut)
+      save(modglmm, file = modelOut, compress = FALSE)
+      modglmmSaved <- modglmm # what load(modelOut) returns below, without reading the file again
       if (verbose) cat(sprintf("[TIMING:PP] save modglmm: %.2fs\n", (proc.time() - .t_pp_save)[3]))
     }
 
@@ -1618,7 +1655,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       set_Diagof_StdGeno_LOCO()
     }
     cat("Start estimating variance ratios\n")
-    load(modelOut)
+    if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
     use_sandwich <- extractVarianceRatio_multiV(
       obj.glmm.null = modglmm,
       obj.glm.null = fit0, maxiterPCG = maxiterPCG,
@@ -1635,7 +1672,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
       cateVarRatioMaxMACVecInclude = cateVarRatioMaxMACVecInclude,
       minMAFforGRM = minMAFforGRM, isDiagofKinSetAsOne = isDiagofKinSetAsOne,
       includeNonautoMarkersforVarRatio = includeNonautoMarkersforVarRatio, isStoreSigma = isStoreSigma, useGRMtoFitNULL = useGRMtoFitNULL,
-      smwCacheMemLimitMB = smwCacheMemLimitMB,
+      smwCacheMemLimitMB = smwCacheMemLimitMB, exactTrace = exactTrace,
       verbose = verbose
     )
   } else {
@@ -1645,7 +1682,7 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   closeGenoFile_plink()
   # clean up saved model (as in ReadModel)
   if (isShrinkModelOutput) {
-    load(modelOut)
+    if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
     modglmm$use_sandwich <- use_sandwich
     modglmm$useGRMtoFitNULL <- useGRMtoFitNULL # step 2 uses this to decide whether closed-form GxE conditioning applies
     modglmm$Y <- NULL
@@ -1667,7 +1704,8 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     modglmm$use_sandwich <- use_sandwich
     modglmm$useGRMtoFitNULL <- useGRMtoFitNULL
   }
-  save(modglmm, file = modelOut)
+  # uncompressed: gzip of ~60 MB of doubles costs ~5 s per save (and ~1 s per load) for ~20% smaller files
+  castie_save_model(modglmm, modelOut)
 
   cat(sprintf("[TIMING] Variance ratio estimation + final save: %.1fs\n", (proc.time() - .t_varratio)[3]))
   .report_mem("after Variance ratio estimation")
@@ -1705,6 +1743,7 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
                                         isStoreSigma = FALSE,
                                         useGRMtoFitNULL = TRUE,
                                         smwCacheMemLimitMB = NULL,
+                                        exactTrace = FALSE,
                                         verbose = FALSE) {
   obj.noK <- obj.glmm.null$obj.noK
   if (file.exists(testOut)) {
@@ -1907,6 +1946,13 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
   # var_weights_sample = var_weights[uniqsampleind]
 
 
+  vrDonor <- NULL
+  if (exactTrace && isStoreSigma && !useSparseGRMforVarRatio && !useGRMtoFitNULL && obj.glmm.null$traitType %in% c("binary", "count")) {
+    vrDonor <- .vr_donor_setup(obj.glmm.null, W, tauVecNew, b, Sigma_iX_noLOCO, XtSigma_iX_inv)
+    mI <- if (obj.glmm.null$traitType == "binary") mu * (1 - mu) * var_weights else mu * var_weights
+    mI <- as.vector(t(mI) %*% I_mat) # var2null_sample and var2null_noXadj weights, as in the loop below
+    n_donors <- ncol(I_mat) # the sandwich threshold below
+  }
   Vsample0 <- as.vector(t(obj.noK$V) %*% I_mat)
   Xsample0 <- obj.glmm.null$sampleXMat
   XVsample0 <- t(Xsample0 * Vsample0)
@@ -1979,12 +2025,14 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
             G0 <- 2 - G0
           }
           G0sample <- G0
-          G0 <- as.numeric(I_mat %*% G0sample)
+          G0 <- G0sample[b] # = I_mat %*% G0sample, exactly
+          gCell <- G0sample # the donor genotypes the cells carry
 
           CHR <- bimPlink[Indexvector_forVarRatio[i] + 1, 1]
           cat("CHR ", CHR, "\n")
           if (sum(G0) / (2 * length(G0)) > 0.5) {
             G0 <- 2 - G0
+            gCell <- 2 - G0sample
           }
           NAset <- which(G0 == 0)
           AC <- sum(G0)
@@ -1996,6 +2044,26 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
               autoMarker <- TRUE
             } else {
               autoMarker <- FALSE
+            }
+
+            if (!is.null(vrDonor)) { # exactTrace: the same quantities from donor-level forms (vr_donor.R)
+              v <- .vr_donor_marker(vrDonor, gCell)
+              cat("AC ", AC, "  S ", v$S, "  p_exact ", pchisq(v$S^2 / v$var1, df = 1, lower.tail = F), "\n")
+              G_noXadj <- as.vector(G0sample - mean(G0sample))
+              G0_sample_tilde <- G0sample - XXVXsample_inv0 %*% (XVsample0 %*% G0sample)
+              var2_a <- t(G0_sample_tilde) %*% ((obj.glmm.null$spSigma) %*% G0_sample_tilde)
+              cat("AC ", AC, "  var1 ", v$var1, "  var2null ", v$var2null, "\n")
+              varRatio_sparseGRM_vec[n_acc] <- v$var1 / var2_a[1, 1]
+              varRatio_NULL_vec[n_acc] <- v$var1 / v$var2null
+              varRatio_NULL_sample_vec[n_acc] <- v$var1 / innerProduct(mI, G0_sample_tilde * G0_sample_tilde)
+              varRatio_NULL_noXadj_vec[n_acc] <- v$var1 / innerProduct(mI, G_noXadj * G_noXadj)
+              varRatio_NULL_eg_mat[n_acc, ] <- v$var1GE / v$var2nullGE
+              varRatio_sparse_eg_mat[n_acc, ] <- v$var1GE / v$var2sparseGE
+              varModel_egcondg_mat[n_acc, ] <- v$varModelGEcond
+              varSW_egcondg_mat[n_acc, ] <- v$varSWGEcond
+              numTestedMarker <- numTestedMarker + 1
+              if (indexInMarkerList - 1 == length(listOfMarkersForVarRatio[[k]])) numTestedMarker <- numMarkers0
+              next
             }
 
             G <- G0 - obj.noK$XXVX_inv %*% (obj.noK$XV %*% G0) # G1 is X adjusted
@@ -2402,7 +2470,7 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
 
 
 # Fits the null glmm
-glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
+glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, tauZeroCutoff = tol, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
   # Fits the null generalized linear mixed model for a poisson, binomial, and gaussian
   # Args:
   #  genofile: string. Plink file for the M1 markers to be used to construct the genetic relationship matrix
@@ -2636,7 +2704,7 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
     # }
 
 
-    fit <- fitglmmaiRPCG_multiV(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tol, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
+    fit <- fitglmmaiRPCG_multiV(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tauZeroCutoff, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
 
     t_end_fitglmmaiRPCG <- proc.time()
     cat("t_end_fitglmmaiRPCG - t_begin_fitglmmaiRPCG\n")
@@ -2827,7 +2895,7 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
 
 
 # Fits the null glmm
-glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
+glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, isCovariateOffset, fit0, tau = c(0, 0), fixtau = c(0, 0), maxiter = 20, tol = 0.02, tauZeroCutoff = tol, verbose = TRUE, nrun = 30, tolPCG = 1e-5, maxiterPCG = 500, subPheno, indicatorGenoSamplesWithPheno, obj.noK, out.transform, tauInit, memoryChunk, LOCO, chromosomeStartIndexVec, chromosomeEndIndexVec, traceCVcutoff, isCovariateTransform, isDiagofKinSetAsOne, isLowMemLOCO, covarianceIdxMat = NULL, isStoreSigma = FALSE, useSparseGRMtoFitNULL = TRUE, useGRMtoFitNULL = TRUE, isSparseGRMIdentity = FALSE) {
   # Fits the null generalized linear mixed model for a poisson, binomial, and gaussian
   # Args:
   #  genofile: string. Plink file for the M1 markers to be used to construct the genetic relationship matrix
@@ -3062,7 +3130,7 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
     # }
 
 
-    fit <- fitglmmaiRPCG_multiV_eMat(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tol, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
+    fit <- fitglmmaiRPCG_multiV_eMat(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tauZeroCutoff, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
 
     t_end_fitglmmaiRPCG <- proc.time()
     cat("t_end_fitglmmaiRPCG - t_begin_fitglmmaiRPCG\n")
