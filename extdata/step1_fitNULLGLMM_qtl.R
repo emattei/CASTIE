@@ -685,6 +685,7 @@ file.remove(datasubsetFile)
 
 if(!is.null(tauTable)){
 tauInit = colMeans(tauTable)
+cat("tauInit from tauTable:", tauInit, "\n")
 #opt$maxiter = 1
 
 }else{

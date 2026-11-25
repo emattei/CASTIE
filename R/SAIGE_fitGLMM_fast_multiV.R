@@ -1159,7 +1159,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
   }
 
 
-  cat("glm:\n")
   obj.noK <- NULL
 
 
@@ -1541,7 +1540,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
 
 
     t_end <- proc.time()
-    cat("t_end - t_begin, fitting the NULL model took\n")
 
 
     # if(bedFile != "" & !useGRMtoFitNULL){
@@ -2404,13 +2402,14 @@ extractVarianceRatio_multiV <- function(obj.glmm.null,
     median_ratios <- apply(varSWtoModel_egcondg_mat, 2, median, na.rm = TRUE)
     cat("threshold for using sandwich variance:", threshold, "\n")
     cat("median sandwich/model variance ratios per context:\n")
+    cat(median_ratios, "\n")
     use_sandwich <- median_ratios > threshold
     # for donor level context, do not use sandwich variance
     use_sandwich[obj.glmm.null$eMatIsSample] <- FALSE
     cat("use_sandwich per context:\n")
+    cat(use_sandwich, "\n")
   }
 
-  data <- read.table(varRatioOutFile, header = F)
   return(use_sandwich)
 }
 
@@ -2509,10 +2508,6 @@ glmmkin.ai_PCG_Rcpp_multiV <- function(bedFile, bimFile, famFile, Xorig, isCovar
 
   alpha0 <- fit0$coef
   eta0 <- eta
-
-
-  cat("tauInit")
-  print(tauInit)
 
   tau[1:length(tau)] <- 0
   if (family$family %in% c("poisson", "binomial")) {
@@ -2930,9 +2925,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
   alpha0 <- fit0$coef
   eta0 <- eta
 
-
-  cat("tauInit")
-
   tau[1:length(tau)] <- 0
   if (family$family %in% c("poisson", "binomial")) {
     # if(family$family %in% c("binomial")) {
@@ -3047,7 +3039,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
     # cat("eta0 ", eta0, "\n")
     re.coef <- Get_Coef_multiV(y, X, tau, family, alpha0, eta0, offset, verbose = verbose, maxiterPCG = maxiterPCG, tolPCG = tolPCG, maxiter = maxiter, LOCO = FALSE, var_weights = var_weights)
     t_end_Get_Coef <- proc.time()
-    cat("t_end_Get_Coef - t_begin_Get_Coef\n")
     # if(isStoreSigma){
     #  gen_sp_Sigma_multiV(re.coef$W, tau)
     # }
@@ -3056,7 +3047,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
     fit <- fitglmmaiRPCG_multiV_eMat(re.coef$Y, X, re.coef$W, tau, fixtau, re.coef$Sigma_iY, re.coef$Sigma_iX, re.coef$cov, nrun, maxiterPCG, tolPCG, tol = tauZeroCutoff, traceCVcutoff = traceCVcutoff, LOCO = FALSE)
 
     t_end_fitglmmaiRPCG <- proc.time()
-    cat("t_end_fitglmmaiRPCG - t_begin_fitglmmaiRPCG\n")
 
     tau <- as.numeric(fit$tau)
     cov <- re.coef$cov
@@ -3170,7 +3160,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
 
   glmmResult$LOCO <- LOCO
   t_end_null <- proc.time()
-  cat("t_end_null - t_begin, fitting the NULL model without LOCO took\n")
   # if(isStoreSigma){
   #   gen_sp_Sigma_multiV(re.coef$W, tau)
   # }
@@ -3189,7 +3178,6 @@ glmmkin.ai_PCG_Rcpp_multiV_eMat <- function(bedFile, bimFile, famFile, Xorig, is
         t_begin_Get_Coef_LOCO <- proc.time()
         re.coef_LOCO <- Get_Coef_multiV(y, X, tau, family, alpha, eta, offset, verbose = verbose, maxiterPCG = maxiterPCG, tolPCG = tolPCG, maxiter = maxiter, LOCO = TRUE, var_weights = varWeights)
         t_end_Get_Coef_LOCO <- proc.time()
-        cat("t_end_Get_Coef_LOCO - t_begin_Get_Coef_LOCO\n")
         cov <- re.coef_LOCO$cov
         alpha <- re.coef_LOCO$alpha
         eta <- re.coef_LOCO$eta
