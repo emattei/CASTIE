@@ -59,6 +59,9 @@ Get_Coef_multiV <- function(y, X, tau, family, alpha0, eta0, offset, maxiterPCG,
     alpha0 <- alpha
     eta_prev <- eta
   }
+  # With tolEta, return Sigma^-1 Y, Sigma^-1 X and cov of the returned Y and W: the loop above computes them
+  # before its last update of Y and W, and for sparse counts Y = eta + (y - mu) / mu moves a lot with eta.
+  if (!is.infinite(tolEta)) re.coef <- getCoefficients_multiV(Y, X, W, tau, maxiter = maxiterPCG, tol = tolPCG, LOCO)
 
   print("alpha")
   print(alpha)
@@ -83,11 +86,20 @@ ScoreTest_NULL_Model <- function(mu, mu2, y, X) {
 }
 
 ## suggested by Shawn 01-19-2018
+.covt_cache <- new.env(parent = emptyenv()) # Covariate_Transform, options(CASTIE.cache = TRUE)
+
 Covariate_Transform <- function(formula, data) {
   X1 <- model.matrix(formula, data = data)
   #  X1=X1[,c(2:ncol(X1))] #remove intercept
   formula.frame <- model.frame(formula, data = data)
   Y <- model.response(formula.frame, type = "any")
+  # options(CASTIE.cache = TRUE) (step12_batch_qtl.R): the covariates are the same for every gene of a session,
+  # so the collinearity check and the QR are reused when the design is identical
+  use_cache <- isTRUE(getOption("CASTIE.cache")) && !anyNA(Y)
+  if (use_cache && identical(.covt_cache$X1, X1)) {
+    return(list(Y = Y, X1 = .covt_cache$X1_new, Param.transform = .covt_cache$Param.transform))
+  }
+  X1_in <- X1
   X_name <- colnames(X1)
 
   # First run linear regression to identify multi collinearity
@@ -117,7 +129,8 @@ Covariate_Transform <- function(formula, data) {
   # Make square summation=N (so mean=1)
   X1_new <- X1_Q * sqrt(N)
   Param.transform <- list(qrr = qrr, N = N, X_name = X_name, idx.na = idx.na)
-  re <- list(Y = Y, X1 = X1_new, Param.transform = Param.transform)
+  if (use_cache) list2env(list(X1 = X1_in, X1_new = X1_new, Param.transform = Param.transform), envir = .covt_cache)
+  list(Y = Y, X1 = X1_new, Param.transform = Param.transform)
 }
 
 # In case to recover original scale coefficients
