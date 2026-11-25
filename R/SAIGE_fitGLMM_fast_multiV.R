@@ -1612,7 +1612,6 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     }
     cat("Start estimating variance ratios\n")
     if (is.null(modglmmSaved)) load(modelOut) else modglmm <- modglmmSaved
-    modglmm$obj.noK <- .restore_noK_XV(modglmm$obj.noK, modglmm$X) # skipModelFitting: a slimmed null model
     use_sandwich <- extractVarianceRatio_multiV(
       obj.glmm.null = modglmm,
       obj.glm.null = fit0, maxiterPCG = maxiterPCG,
