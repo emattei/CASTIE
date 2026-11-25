@@ -36,7 +36,7 @@ removeLOCOResult <- function(chromList, obj.glmm.null) {
 
 ReadModel <- function(GMMATmodelFile = "", chrom = "", LOCO = TRUE, is_Firth_beta = FALSE, is_EmpSPA = FALSE, espa_nt = 9999, espa_range = c(-20, 20)) {
   # Check file existence
-  Check_File_Exist(GMMATmodelFile, "GMMATmodelFile")
+  if (!castie_model_exists(GMMATmodelFile)) stop("ERROR! GMMATmodelFile ", GMMATmodelFile, " does not exist\n")
   if (!LOCO %in% c(TRUE, FALSE)) {
     stop("LOCO should be TRUE or FALSE.")
   }

@@ -544,21 +544,19 @@ if(!opt$isCovariateOffset){
 
         pcg_resolved <- FALSE
         if(pcg_success){
-          my_env_pcg = new.env()
-          load(paste0(outputprefixsubset, ".pcg.rda"), envir = my_env_pcg)
-          modglmm_pcg = my_env_pcg$modglmm
+          modglmm_pcg = castie_load_model(paste0(outputprefixsubset, ".pcg.rda"))
           print(modglmm_pcg$theta)
           if(!is.null(modglmm_pcg$theta) &&
              !(sum(modglmm_pcg$theta[2:length(modglmm_pcg$theta)]) < 0 ||
                sum(modglmm_pcg$theta[2:length(modglmm_pcg$theta)]) > 10  )){
-            file.rename(paste0(outputprefixsubset, ".pcg.rda"), paste0(outputprefixsubset, ".rda"))
+            castie_rename_model(paste0(outputprefixsubset, ".pcg.rda"), paste0(outputprefixsubset, ".rda"))
             tauVec = modglmm_pcg$theta
             tauTable = rbind(tauTable, tauVec)
             cat("PCG solver succeeded, theta in bounds\n")
             pcg_resolved <- TRUE
           } else {
             cat("PCG solver: theta still out of bounds\n")
-            if(file.exists(paste0(outputprefixsubset, ".pcg.rda"))) file.remove(paste0(outputprefixsubset, ".pcg.rda"))
+            castie_remove_model(paste0(outputprefixsubset, ".pcg.rda"))
           }
         }
 
@@ -632,13 +630,11 @@ if(!opt$isCovariateOffset){
               eCovarCol=ecovars,
               perContextTau=opt$perContextTau, exactTrace=opt$exactTrace, activeSetAI=opt$activeSetAI, tolEta=opt$tolEta
           )
-          my_env = new.env()
-          load(paste0(outputprefixsubset, ".offset.rda"), envir = my_env)
-          modglmm = my_env$modglmm
+          modglmm = castie_load_model(paste0(outputprefixsubset, ".offset.rda"))
           print(modglmm$theta)
           if(sum(modglmm$theta[2:length(modglmm$theta)]) < 0 || sum(modglmm$theta[2:length(modglmm$theta)]) > 10 ){
 	    cat("All variance component parameter estiamtes are out of bounds.\n")
-            file.remove(paste0(outputprefixsubset, ".offset.rda"))
+            castie_remove_model(paste0(outputprefixsubset, ".offset.rda"))
             if (file.exists(paste0(outputprefixsubset, ".offset.varianceRatio.txt"))) {
               file.remove(paste0(outputprefixsubset, ".offset.varianceRatio.txt"))
             }else{
@@ -649,7 +645,7 @@ if(!opt$isCovariateOffset){
           }else{
             tauVec = modglmm$theta
             tauTable = rbind(tauTable, tauVec)
-            file.rename(paste0(outputprefixsubset, ".offset.rda"), paste0(outputprefixsubset, ".rda"))
+            castie_rename_model(paste0(outputprefixsubset, ".offset.rda"), paste0(outputprefixsubset, ".rda"))
             if (file.exists(paste0(outputprefixsubset, ".offset.varianceRatio.txt"))) {
               file.rename(paste0(outputprefixsubset, ".offset.varianceRatio.txt"), paste0(outputprefixsubset, ".varianceRatio.txt"))
             }else{
@@ -674,7 +670,7 @@ if(!opt$isCovariateOffset){
 }
 
 
-file.remove(paste0(outputprefixsubset, ".rda"))
+castie_remove_model(paste0(outputprefixsubset, ".rda"))
 file.remove(datasubsetFile)
 
 
@@ -845,7 +841,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
 
 .thetaOK <- function(suffix) {
   rda <- paste0(opt$outputPrefix, suffix, ".rda")
-  if (!file.exists(rda) || file.size(rda) == 0) return(FALSE)
+  if (!castie_model_exists(rda)) return(FALSE)
   m <- tryCatch(castie_load_model(rda), error = function(e) FALSE) # the in-memory model when it is the one just saved
   if (isFALSE(m)) return(FALSE)
   print(m$theta)
@@ -856,7 +852,7 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
 .promote <- function(suffix) {
   from_rda <- paste0(opt$outputPrefix, suffix, ".rda")
   to_rda   <- paste0(opt$outputPrefix, ".rda")
-  if (file.exists(from_rda)) file.rename(from_rda, to_rda)
+  castie_rename_model(from_rda, to_rda)
   from_vr <- paste0(opt$outputPrefix, suffix, ".varianceRatio.txt")
   to_vr   <- paste0(opt$outputPrefix, ".varianceRatio.txt")
   if (file.exists(from_vr)) {
@@ -869,8 +865,8 @@ if (isTRUE(opt$verbose)) gc(full = TRUE, reset = TRUE, verbose = FALSE)
 }
 
 .cleanup <- function(suffix) {
-  for (f in c(paste0(opt$outputPrefix, suffix, ".rda"),
-              paste0(opt$outputPrefix, suffix, ".varianceRatio.txt"),
+  castie_remove_model(paste0(opt$outputPrefix, suffix, ".rda"))
+  for (f in c(paste0(opt$outputPrefix, suffix, ".varianceRatio.txt"),
               paste0(opt$outputPrefix_varRatio, suffix, ".varianceRatio.txt")))
     if (file.exists(f)) file.remove(f)
 }
@@ -1003,7 +999,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
   emat_col_names      <- NULL
   m                   <- NULL  # always defined so rescue block is safe
 
-  if (file.exists(model_file) && file.size(model_file) > 0) {
+  if (castie_model_exists(model_file)) {
     m <- castie_load_model(model_file)
     theta_vals <- m$theta
     converged  <- isTRUE(m$converged)
@@ -1018,8 +1014,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
                sum(theta_vals[2:length(theta_vals)]) > 10
 
   # require var ratio file for a usable result
-  overall_ok <- file.exists(model_file) && converged && !theta_oob &&
-                file.size(model_file) > 0 && var_ratio_file != ""
+  overall_ok <- castie_model_exists(model_file) && converged && !theta_oob && var_ratio_file != ""
 
   if (!overall_ok && !all_failed && !is.null(m) && !is.null(m$use_sandwich)) {
     m$use_sandwich <- rep(TRUE, length(m$use_sandwich))
@@ -1061,7 +1056,7 @@ write_step1_report <- function(outputPrefix, outputPrefix_varRatio,
     "",
     "--- Output files ---",
     paste0("Model file        : ", model_file,
-           " (exists: ", file.exists(model_file),
+           " (exists: ", castie_model_exists(model_file, reserved = TRUE),
            if (all_failed) ", will be removed" else "", ")"),
     paste0("Var ratio file    : ",
            if (var_ratio_file != "") var_ratio_file else "not found")
@@ -1104,8 +1099,8 @@ if (opt$isWriteReport || step1_all_failed) {
 }
 
 if (step1_all_failed) {
-  for (f in c(paste0(opt$outputPrefix, ".rda"),
-              paste0(opt$outputPrefix, ".varianceRatio.txt"),
+  castie_remove_model(paste0(opt$outputPrefix, ".rda"))
+  for (f in c(paste0(opt$outputPrefix, ".varianceRatio.txt"),
               paste0(opt$outputPrefix_varRatio, ".varianceRatio.txt")))
     if (file.exists(f)) file.remove(f)
 }
