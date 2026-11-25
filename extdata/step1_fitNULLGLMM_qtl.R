@@ -76,7 +76,7 @@ option_list <- list(
   make_option("--LOCO", type="logical", default=TRUE,
     help="Whether to apply the leave-one-chromosome-out (LOCO) approach when fitting the null model using the full GRM [default=TRUE]."),
   make_option("--isLowMemLOCO", type="logical", default=FALSE,
-    help="Whehter to output the model file by chromosome when LOCO=TRUE. If TRUE, the memory usage in Step 1 and Step 2 will be lower [default=FALSE]"),
+    help="Not supported: TRUE stops step 1 [default=FALSE]"),
   make_option("--traceCVcutoff", type="numeric", default=0.0025,
     help="Optional. Threshold for coefficient of variation (CV) for the trace estimator. Number of runs for trace estimation will be increased until the CV is below the threshold [default=0.0025]."),
   make_option("--nrun", type="numeric", default=30,
@@ -154,7 +154,7 @@ option_list <- list(
    help="Optional. Whether to save a fitting report (solver used, convergence, offset flag) to a report/ subdirectory next to outputPrefix. [default, 'FALSE']"),
   make_option("--initialSubSampleProp",
   type="numeric", default=1,
-      help="Optional. The proportion of subsamples used for estimate the inital values for variance covariance parameters"),
+      help="Not supported: values below 1 stop step 1 [default=1]"),
   make_option("--library", type="character", default="",
       help="Optional. Path to the library directory where CASTIE is installed")
 )
@@ -174,6 +174,10 @@ for (o in option_list) {
 
 ## NA sentinel from optparse -> NULL so the fitNULLGLMM_multiV default kicks in.
 if (is.na(opt$smwCacheMemLimitMB)) opt$smwCacheMemLimitMB <- NULL
+
+## Unsupported options: stop before any fit
+if (!isFALSE(opt$isLowMemLOCO)) stop("--isLowMemLOCO=TRUE is not supported; use --isLowMemLOCO=FALSE")
+if (!isTRUE(opt$initialSubSampleProp >= 1)) stop("--initialSubSampleProp below 1 is not supported; use the default, 1")
 
 ## Load CASTIE with optional library path
 if(opt$library != ""){
