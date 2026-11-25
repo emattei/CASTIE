@@ -6615,7 +6615,6 @@ Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec
         }
         }
         arma::fmat Xmatt = Xmat.t();
-        //arma::fmat cov = inv_sympd(Xmatt * Sigma_iX);
         arma::fmat cov;
         try {
           cov = arma::inv_sympd(arma::symmatu(Xmatt * Sigma_iX));
@@ -6623,10 +6622,8 @@ Rcpp::List getCoefficients_multiV(arma::fvec& Yvec, arma::fmat& Xmat, arma::fvec
           cov = arma::pinv(arma::symmatu(Xmatt * Sigma_iX));
           cout << "inv_sympd failed, inverted with pinv" << endl;
         }
-	cov.print("cov"); 	
+        // (the 31 x 31 cov was printed here on every call: ~45 times per gene)
         arma::fmat Sigma_iXt = Sigma_iX.t();
-	//Sigma_iXt.print("Sigma_iXt");
-	//Yvec.print("Yvec");
         arma::fvec SigmaiXtY = Sigma_iXt * Yvec;
         arma::fvec alpha = cov * SigmaiXtY;
 	

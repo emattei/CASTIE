@@ -362,6 +362,8 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     }
   }
   .t0_total <- proc.time()
+  # options(CASTIE.fastGLM = TRUE): every glm() below fits with castie_glm_fit (glm.fit with Cholesky solves)
+  if (isTRUE(getOption("CASTIE.fastGLM"))) glm <- function(...) stats::glm(..., method = castie_glm_fit)
   modglmmSaved <- NULL # the model as last saved to modelOut, when it is still in memory
 
   if (!file.exists(phenoFile)) {
@@ -812,7 +814,9 @@ fitNULLGLMM_multiV <- function(plinkFile = "",
     out.transform <- NULL
   }
 
-  if (traitType == "binary") {
+  if (!isCovariateOffset) {
+    # modwitcov is only used for the covariate offset; otherwise it is the same glm as fit0 below
+  } else if (traitType == "binary") {
     if (length(offsetCol) == 0) {
       modwitcov <- glm(formula.new,
         data = data.new,

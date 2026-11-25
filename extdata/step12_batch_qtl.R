@@ -16,7 +16,7 @@ opt <- parse_args(OptionParser(option_list = list(
 )))
 script <- c("1" = unname(Sys.which("step1_fitNULLGLMM_qtl.R")), "2" = unname(Sys.which("step2_tests_qtl.R")))
 if (!all(nzchar(script))) stop("step1_fitNULLGLMM_qtl.R and step2_tests_qtl.R must be on PATH")
-options(CASTIE.gc = FALSE, CASTIE.cache = TRUE) # no explicit gc(); read the phenotype metadata and transform the covariates once
+options(CASTIE.gc = FALSE, CASTIE.cache = TRUE, CASTIE.fastGLM = TRUE) # no explicit gc(); read the phenotype metadata and transform the covariates once; glm.fit with Cholesky solves
 
 failed <- character(0)
 for (ln in readLines(opt$batch)) {
