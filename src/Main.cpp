@@ -21,6 +21,7 @@
 #include "VCF.hpp"
 #include "SAIGE_test.hpp"
 #include "UTIL.hpp"
+#include "genotype_index.hpp"
 #include "CCT.hpp"
 #include "GENO_null.hpp"
 #include "SKAT_funcs.hpp"
@@ -408,25 +409,8 @@ void mainMarkerInCPP(
     //free(end);
 
     bool flip = false;
-    std::string t_genoIndex_str = t_genoIndex.at(i);
-    char* end;
-    uint64_t gIndex = std::strtoull( t_genoIndex_str.c_str(), &end,10 );
-    std::remove(end);
-
-    uint64_t gIndex_prev = 0;
-    if(i == 0){
-        gIndex_prev = 0;
-    }else{
-        char* end_prev;
-	std::string t_genoIndex_prev_str;
-        if(t_genoType == "bgen"){
-            t_genoIndex_prev_str = t_genoIndex_prev.at(i-1);
-        }else if(t_genoType == "plink"){
-            t_genoIndex_prev_str = t_genoIndex.at(i-1);
-        }
-        gIndex_prev = std::strtoull( t_genoIndex_prev_str.c_str(), &end_prev,10 );
-        std::remove(end_prev);
-    }
+    uint64_t gIndex, gIndex_prev;
+    parse_genotype_indices(t_genoType, t_genoIndex_prev, t_genoIndex, i, gIndex_prev, gIndex);
 
     //Main.cpp
     //PLINK or BGEN 
@@ -1880,25 +1864,8 @@ Rcpp::List mainRegionInCPP(
     //GVec.resize(t_n);
     GVec.zeros();
 
-    std::string t_genoIndex_str = t_genoIndex.at(i);
-    char* end;
-    uint64_t gIndex = std::strtoull( t_genoIndex_str.c_str(), &end,10 );
-    std::remove(end);
-
-    uint64_t gIndex_prev = 0;
-    if(i == 0){
-        gIndex_prev = 0;
-    }else{
-        char* end_prev;
-        std::string t_genoIndex_prev_str;
-        if(t_genoType == "bgen"){
-            t_genoIndex_prev_str = t_genoIndex_prev.at(i-1);
-        }else if(t_genoType == "plink"){
-            t_genoIndex_prev_str = t_genoIndex.at(i-1);
-        }
-        gIndex_prev = std::strtoull( t_genoIndex_prev_str.c_str(), &end_prev,10 );
-        std::remove(end_prev);
-    }
+    uint64_t gIndex, gIndex_prev;
+    parse_genotype_indices(t_genoType, t_genoIndex_prev, t_genoIndex, i, gIndex_prev, gIndex);
 
 
     bool isReadMarker = Unified_getOneMarker(t_genoType, gIndex_prev, gIndex, ref, alt, marker, pd, chr, altFreq, altCounts, missingRate, imputeInfo,
@@ -3424,29 +3391,8 @@ void assign_conditionMarkers_factors(
 
 
 
-    std::string t_genoIndex_str = t_genoIndex.at(i);
-    char* end;
-    uint64_t gIndex = std::strtoull( t_genoIndex_str.c_str(), &end,10 );
-    std::remove(end);
-
-    uint64_t gIndex_prev = 0;
-    if(i == 0){
-        gIndex_prev = 0;
-    }else{
-        char* end_prev;
-	std::string t_genoIndex_prev_str;
-        if(t_genoType == "bgen"){
-            t_genoIndex_prev_str = t_genoIndex_prev.at(i-1);
-            gIndex_prev = std::strtoull( t_genoIndex_prev_str.c_str(), &end_prev,10 );
-        }else if(t_genoType == "plink"){
-            t_genoIndex_prev_str = t_genoIndex.at(i-1);
-            gIndex_prev = std::strtoull( t_genoIndex_prev_str.c_str(), &end_prev,10 );
-        }
-	//else if(t_genoType == "vcf"){
-         //   gIndex_prev = 0;	
-	//}
-	std::remove(end_prev);
-    }
+    uint64_t gIndex, gIndex_prev;
+    parse_genotype_indices(t_genoType, t_genoIndex_prev, t_genoIndex, i, gIndex_prev, gIndex);
 
     bool isReadMarker = Unified_getOneMarker(t_genoType, gIndex_prev, gIndex, ref, alt, marker, pd, chr, altFreq, altCounts, missingRate, imputeInfo,
                                           isOutputIndexForMissing, // bool t_isOutputIndexForMissing,
@@ -8454,25 +8400,8 @@ void mainMarkerInCPP_multi(
     //free(end);
 
     bool flip = false;
-    std::string t_genoIndex_str = t_genoIndex.at(i);
-    char* end;
-    uint64_t gIndex = std::strtoull( t_genoIndex_str.c_str(), &end,10 );
-    std::remove(end);
-
-    uint64_t gIndex_prev = 0;
-    if(i == 0){
-        gIndex_prev = 0;
-    }else{
-        char* end_prev;
-        std::string t_genoIndex_prev_str;
-        if(t_genoType == "bgen"){
-            t_genoIndex_prev_str = t_genoIndex_prev.at(i-1);
-        }else if(t_genoType == "plink"){
-            t_genoIndex_prev_str = t_genoIndex.at(i-1);
-        }
-        gIndex_prev = std::strtoull( t_genoIndex_prev_str.c_str(), &end_prev,10 );
-        std::remove(end_prev);
-    }
+    uint64_t gIndex, gIndex_prev;
+    parse_genotype_indices(t_genoType, t_genoIndex_prev, t_genoIndex, i, gIndex_prev, gIndex);
     //Main.cpp
     //PLINK or BGEN
     //uint32_t gIndex_temp = gIndex;
