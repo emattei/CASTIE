@@ -26,6 +26,14 @@ using namespace std;
  
 namespace VCF {
  
+  // multiallelic records are not supported: reading only the first ALT would misreport the record
+  static void stop_unless_one_alt(const savvy::site_info& t_site)
+  {
+    if (t_site.alts().size() != 1)
+      Rcpp::stop("VCF record " + t_site.chromosome() + ":" + std::to_string(t_site.position()) + " has " +
+                 std::to_string(t_site.alts().size()) + " ALT alleles; only biallelic records are supported.");
+  }
+
   VcfClass::VcfClass(std::string t_vcfFileName,
             std::string t_vcfFileIndex,
             std::string t_vcfField,
@@ -64,13 +72,12 @@ namespace VCF {
         [&](const savvy::header_value_details& h) { return h.id == "HDS"; }) != m_marker_file.format_headers().end()) {
         fmtField = "HDS";
       } else {
-        std::cerr << "ERROR: vcfField (" << fmtField << ") not present in genotype file." << std::endl;
-        return false;
+        Rcpp::stop("vcfField (" + fmtField + ") not present in genotype file.");
       }
     }
     m_fmtField = fmtField;
   } else {
-    std::cerr << "WARNING: Open VCF failed" << std::endl;
+    Rcpp::stop("Cannot open VCF file: " + t_vcfFileName);
   }
   return(isVcfOpen);
  }
@@ -176,10 +183,10 @@ namespace VCF {
      bool isReadVariant = true;
      variant_group_iterator end{};
      if(m_it_ != end){
-       if (m_it_->alts().size() != 1)
-       {
-         std::cerr << "Warning: skipping multiallelic variant" << std::endl;
-       }
+       stop_unless_one_alt(*m_it_);
+       savvy::compressed_vector<float> variant_dosages;
+       if (!m_it_->get_format(m_fmtField, variant_dosages))
+         Rcpp::stop("VCF record " + m_it_->chromosome() + ":" + std::to_string(m_it_->position()) + " has no " + m_fmtField + " field.");
        t_chr = m_it_->chromosome();
        //t_pd = std::to_string(m_it_->position());
        t_pd = m_it_->position();
@@ -203,8 +210,6 @@ namespace VCF {
        dosages.fill(arma::fill::zeros);
        //t_dosage.clear();
        //t_dosage.reserve(m_N);
-       savvy::compressed_vector<float> variant_dosages;
-       m_it_->get_format(m_fmtField, variant_dosages);
        std::size_t ploidy = m_N0 ? variant_dosages.size() / m_N0 : 1;
        savvy::stride_reduce(variant_dosages, ploidy);
        for (auto dose_it = variant_dosages.begin(); dose_it != variant_dosages.end(); ++dose_it) {
@@ -262,16 +267,12 @@ bool VcfClass::getOneMarker_ID(std::string& t_ref,       // REF allele
      bool isReadVariant = true;
 
      if(m_it_ != end){
-       if (m_it_->alts().size() != 1)
-       {
-         std::cerr << "Warning: skipping multiallelic variant" << std::endl;
-       }else{
-         t_chr = m_it_->chromosome();
-         t_pd = m_it_->position();
-         t_ref = m_it_->ref();
-         t_alt = m_it_->alts()[0];
-         t_marker = m_it_->id();
-       }
+       stop_unless_one_alt(*m_it_);
+       t_chr = m_it_->chromosome();
+       t_pd = m_it_->position();
+       t_ref = m_it_->ref();
+       t_alt = m_it_->alts()[0];
+       t_marker = m_it_->id();
     }else{
 	isReadVariant = false;
     }
