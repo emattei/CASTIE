@@ -12,6 +12,7 @@ pixi.lock
 .DS_Store
 CLAUDE.md
 .claude/
+.scratch/
 tutorial/output/
 __pycache__/
 *.pyc
