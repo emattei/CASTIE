@@ -17,7 +17,7 @@ private:
   std::string m_bgenFileName, m_bgenFileIndex;
 
   //variables to reading in bgen
-  FILE *m_fin;
+  FILE *m_fin = NULL;
   //std::ifstream m_ibgenFile;
   std::vector <unsigned char> m_buf;
   std::vector <unsigned char> m_zBuf;
@@ -108,6 +108,7 @@ public:
   uint32_t getM(){return m_M;};
 
   void closegenofile();
+  ~BgenClass() { closegenofile(); }
 };
 
 }

@@ -7,6 +7,7 @@
 // std::this_thread::sleep_for (std::chrono::seconds(1));
 #include <cstdio>         // std::remove
 #include <fstream>
+#include <memory>
 #include <string.h>
 // Currently, omp does not work well, will check it later
 // error: SET_VECTOR_ELT() can only be applied to a 'list', not a 'character'
@@ -37,9 +38,9 @@
 
 // global objects for different genotype formats
 
-static PLINK::PlinkClass* ptr_gPLINKobj = NULL;
-static BGEN::BgenClass* ptr_gBGENobj = NULL;
-static VCF::VcfClass* ptr_gVCFobj = NULL;
+static std::unique_ptr<PLINK::PlinkClass> ptr_gPLINKobj;
+static std::unique_ptr<BGEN::BgenClass> ptr_gBGENobj;
+static std::unique_ptr<VCF::VcfClass> ptr_gVCFobj;
 static SAIGE::SAIGEClass* ptr_gSAIGEobj = NULL;
 static NullGENO::NullGenoClass* ptr_gNULLGENOobj = NULL;
 //single, SAIGE
@@ -1393,13 +1394,14 @@ void setPLINKobjInCPP(std::string t_bimFile,
                       std::vector<std::string> & t_SampleInModel,
                       std::string t_AlleleOrder)
 {
-  delete ptr_gPLINKobj; // the previous gene's object: a session can run many genes
-  ptr_gPLINKobj = new PLINK::PlinkClass(t_bimFile,
+  // build the new reader fully, then replace (and release) the previous gene's one
+  std::unique_ptr<PLINK::PlinkClass> plinkObj(new PLINK::PlinkClass(t_bimFile,
                                         t_famFile,
                                         t_bedFile,
                                         //t_SampleInModel,
-                                        t_AlleleOrder);
-  ptr_gPLINKobj->setPosSampleInPlink(t_SampleInModel);
+                                        t_AlleleOrder));
+  plinkObj->setPosSampleInPlink(t_SampleInModel);
+  ptr_gPLINKobj = std::move(plinkObj);
   
 }
 
@@ -1411,13 +1413,13 @@ void setBGENobjInCPP(std::string t_bgenFileName,
                      std::string t_AlleleOrder)
 {
   std::cout << "t_SampleInBgen " << t_SampleInBgen.size() << std::endl;
-  ptr_gBGENobj = new BGEN::BgenClass(t_bgenFileName,
+  ptr_gBGENobj.reset(new BGEN::BgenClass(t_bgenFileName,
                                      t_bgenFileIndex,
                                      t_SampleInBgen,
                                      t_SampleInModel,
 				     false,
 				     false,
-                                     t_AlleleOrder);
+                                     t_AlleleOrder));
   //int n = ptr_gBGENobj->getN();
 }
 
@@ -1428,11 +1430,11 @@ void setVCFobjInCPP(std::string t_vcfFileName,
             std::string t_vcfField,
             std::vector<std::string> & t_SampleInModel)
 {
-  ptr_gVCFobj = new VCF::VcfClass(t_vcfFileName,
+  ptr_gVCFobj.reset(new VCF::VcfClass(t_vcfFileName,
 		  		t_vcfFileIndex,
 				t_vcfField,
 				false,
-				t_SampleInModel);
+				t_SampleInModel));
 
 bool isEnd = ptr_gVCFobj->check_iterator_end();
 
@@ -3698,11 +3700,11 @@ arma::vec fast_logistf_fit(arma::mat & x,
 void closeGenoFile(std::string & t_genoType)
 {
   if(t_genoType == "bgen"){
-    ptr_gBGENobj->closegenofile();
+    ptr_gBGENobj.reset();
   }else if(t_genoType == "vcf"){
-    ptr_gVCFobj->closegenofile();
+    ptr_gVCFobj.reset();
   }else if(t_genoType == "plink"){
-    ptr_gPLINKobj->closegenofile();
+    ptr_gPLINKobj.reset();
   }	  
 }
 

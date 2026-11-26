@@ -39,11 +39,12 @@ BgenClass::BgenClass(std::string t_bgenFileName,
                      bool t_isDropmissingdosagesInBgen,
                      std::string t_AlleleOrder)      // added by Wenjian Bi on 03/14/2021: "ref-first" or "alt-first"
 {
-  setBgenObj(t_bgenFileName,
-             t_bgenFileIndex,
-             t_SampleInBgen);
-  
-  setPosSampleInBgen(t_SampleInModel);
+  try {
+    setBgenObj(t_bgenFileName,
+               t_bgenFileIndex,
+               t_SampleInBgen);
+    setPosSampleInBgen(t_SampleInModel);
+  } catch (...) { closegenofile(); throw; }  // a throwing constructor never runs the destructor
   
   setIsDropMissingDosagesInBgen(t_isDropmissingdosagesInBgen);
   
@@ -536,7 +537,8 @@ void BgenClass::setIsDropMissingDosagesInBgen (bool t_isDropmissingdosagesInBgen
 }
 
 void BgenClass::closegenofile(){
-	fclose(m_fin);
+	if (m_fin) fclose(m_fin);
+	m_fin = NULL;
 }
 
 }  
