@@ -28,8 +28,34 @@
 
 #include <Rcpp.h>
 #include "BGEN.hpp"
+#include <sys/stat.h>
 
 namespace BGEN {
+
+// Read exactly n bytes: a short read means a truncated or malformed file.
+static void read_exact(FILE *f, void *buf, size_t n, const char *what)
+{
+  if (fread(buf, 1, n, f) != n)
+    Rcpp::stop("The BGEN file is truncated or malformed: cannot read %s.", what);
+}
+
+// Bytes left after the current position, to check a length read from the file before allocating it.
+static uint64_t bytes_left(FILE *f)
+{
+  struct stat st;
+  long pos = ftell(f);
+  if (pos < 0 || fstat(fileno(f), &st) != 0 || pos > st.st_size) return 0;
+  return st.st_size - pos;
+}
+
+static std::string read_string(FILE *f, uint64_t n, const char *what)
+{
+  if (n > bytes_left(f))
+    Rcpp::stop("The BGEN file is truncated or malformed: %s is longer than the rest of the file.", what);
+  std::string s(n, '\0');
+  read_exact(f, &s[0], n, what);
+  return s;
+}
 
 BgenClass::BgenClass(std::string t_bgenFileName,
                      std::string t_bgenFileIndex,
@@ -68,28 +94,29 @@ void BgenClass::setBgenObj(const std::string t_bgenFileName,
   /********** READ HEADER v1.2**********/
   //m_ibgenFile.open(m_bgenFile.c_str(), std::ios::binary);
   m_fin = fopen(t_bgenFileName.c_str(), "rb");
+  if (!m_fin) Rcpp::stop("Cannot open the BGEN file %s.", t_bgenFileName);
   //chr offset; m_ibgenFile.read(&offset, 4, 1); //cout << "offset: " << offset << endl;
-  uint32_t offset; fread(&offset, 4, 1, m_fin); //cout << "offset: " << offset << endl;
-  uint32_t L_H; fread(&L_H, 4, 1, m_fin); //cout << "L_H: " << L_H << endl;
+  uint32_t offset; read_exact(m_fin, &offset, 4, "the header offset"); //cout << "offset: " << offset << endl;
+  uint32_t L_H; read_exact(m_fin, &L_H, 4, "the header length"); //cout << "L_H: " << L_H << endl;
+  if (L_H < 20) Rcpp::stop("The BGEN header length is %d; it must be at least 20.", L_H);
   
-  
-  fread(&m_M0, 4, 1, m_fin); std::cout << "snpBlocks (Mbgen): " << m_M0 << std::endl;
+  read_exact(m_fin, &m_M0, 4, "the number of variants"); std::cout << "snpBlocks (Mbgen): " << m_M0 << std::endl;
   assert(m_M0 != 0);
   //unsigned int Nbgen; fread(&Nbgen, 4, 1, m_fin); std::cout << "samples (Nbgen): " << Nbgen << std::endl;
-  fread(&m_N0, 4, 1, m_fin); std::cout << "samples (Nbgen): " << m_N0 << std::endl;
+  read_exact(m_fin, &m_N0, 4, "the number of samples"); std::cout << "samples (Nbgen): " << m_N0 << std::endl;
   unsigned int m_Nsample = t_SampleInBgen.size();
   m_SampleInBgen = t_SampleInBgen;
-  if (m_N0 != m_Nsample) {
-    std::cerr << "ERROR: Number of samples in BGEN header does not match sample file" << std::endl;
-    exit(1);
-  }
-  char magic[5]; fread(magic, 1, 4, m_fin); magic[4] = '\0'; //cout << "magic bytes: " << string(magic) << endl;
+  if (m_N0 != m_Nsample)
+    Rcpp::stop("Number of samples in BGEN header (%d) does not match sample file (%d).", m_N0, m_Nsample);
+  char magic[5]; read_exact(m_fin, magic, 4, "the magic number"); magic[4] = '\0'; //cout << "magic bytes: " << string(magic) << endl;
   fseek(m_fin, L_H-20, SEEK_CUR); //cout << "skipping L_H-20 = " << L_H-20 << " bytes (free data area)" << endl;
-  uint32_t flags; fread(&flags, 4, 1, m_fin); //cout << "flags: " << flags << endl;
+  uint32_t flags; read_exact(m_fin, &flags, 4, "the header flags"); //cout << "flags: " << flags << endl;
   uint32_t CompressedSNPBlocks = flags&3; std::cout << "CompressedSNPBlocks: " << CompressedSNPBlocks << std::endl;
-  assert(CompressedSNPBlocks==1); // REQUIRE CompressedSNPBlocks==1
+  if (CompressedSNPBlocks != 1)
+    Rcpp::stop("BGEN compression %d is not supported: only zlib-compressed (1) BGEN files can be read.", CompressedSNPBlocks);
   uint32_t Layout = (flags>>2)&0xf; std::cout << "Layout: " << Layout << std::endl;
-  assert(Layout==1 || Layout==2); // REQUIRE Layout==1 or Layout==2
+  if (Layout != 2)  // getOneMarker reads layout 2 records only
+    Rcpp::stop("BGEN layout %d is not supported: only layout 2 (BGEN v1.2 and v1.3) can be read.", Layout);
   fseek(m_fin, offset+4, SEEK_SET);
 }
 
@@ -137,33 +164,23 @@ void BgenClass::Parse2(unsigned char *buf, uint bufLen, const unsigned char *zBu
   //arma::vec timeoutput0 = getTime();
        
   uLongf destLen = bufLen;
-  if (uncompress(buf, &destLen, zBuf, zBufLen) != Z_OK || destLen != bufLen) {
-    std::cerr << "ERROR: uncompress() failed" << std::endl;
-    exit(1);
-  }
+  if (uncompress(buf, &destLen, zBuf, zBufLen) != Z_OK || destLen != bufLen)
+    Rcpp::stop("Cannot decompress the genotype probabilities of BGEN variant %s.", snpName);
   
   unsigned char *bufAt = buf;
   uint N = bufAt[0]|(bufAt[1]<<8)|(bufAt[2]<<16)|(bufAt[3]<<24); bufAt += 4;
   
-  if (N != m_N0) {
-    std::cerr << "ERROR: " << snpName << " has N = " << N << " (mismatch with header block)" << std::endl;
-    exit(1);
-  }
+  if (N != m_N0)
+    Rcpp::stop("BGEN variant %s has N = %d (mismatch with header block).", snpName, N);
   uint K = bufAt[0]|(bufAt[1]<<8); bufAt += 2;
-  if (K != 2U) {
-    std::cerr << "ERROR: " << snpName << " has K = " << K << " (non-bi-allelic)" << std::endl;
-    exit(1);
-  }
+  if (K != 2U)
+    Rcpp::stop("BGEN variant %s has K = %d alleles (non-bi-allelic).", snpName, K);
   uint Pmin = *bufAt; bufAt++;
-  if (Pmin != 2U) {
-    std::cerr << "ERROR: " << snpName << " has minimum ploidy = " << Pmin << " (not 2)" << std::endl;
-    exit(1);
-  }
+  if (Pmin != 2U)
+    Rcpp::stop("BGEN variant %s has minimum ploidy = %d (not 2).", snpName, Pmin);
   uint Pmax = *bufAt; bufAt++;
-  if (Pmax != 2U) {
-    std::cerr << "ERROR: " << snpName << " has maximum ploidy = " << Pmax << " (not 2)" << std::endl;
-    exit(1);
-  }
+  if (Pmax != 2U)
+    Rcpp::stop("BGEN variant %s has maximum ploidy = %d (not 2).", snpName, Pmax);
   
   //arma::vec timeoutput1 = getTime(); 
   
@@ -171,11 +188,8 @@ void BgenClass::Parse2(unsigned char *buf, uint bufLen, const unsigned char *zBu
 //  std::cout << "N " << N << std::endl;
   for (uint i = 0; i < N; i++) {
     uint ploidyMiss = *bufAt; bufAt++;
-    if (ploidyMiss != 2U && ploidyMiss != 130U) {
-      std::cerr << "ERROR: " << snpName << " has ploidy/missingness byte = " << ploidyMiss
-                << " (not 2 or 130)" << std::endl;
-      exit(1);
-    }
+    if (ploidyMiss != 2U && ploidyMiss != 130U)
+      Rcpp::stop("BGEN variant %s has ploidy/missingness byte = %d (not 2 or 130).", snpName, ploidyMiss);
   }
 
 
@@ -187,15 +201,11 @@ void BgenClass::Parse2(unsigned char *buf, uint bufLen, const unsigned char *zBu
 
 
   uint Phased = *bufAt; bufAt++;
-  if (Phased != 0U) {
-    std::cerr << "ERROR: " << snpName << " has Phased = " << Pmax << " (not 0)" << std::endl;
-    exit(1);
-  }
+  if (Phased != 0U)
+    Rcpp::stop("BGEN variant %s has Phased = %d (not 0).", snpName, Phased);
   uint B = *bufAt; bufAt++;
-  if (B != 8U) {
-    std::cerr << "ERROR: " << snpName << " has B = " << B << " (not 8)" << std::endl;
-    exit(1);
-  }
+  if (B != 8U)
+    Rcpp::stop("BGEN variant %s has B = %d bits (not 8).", snpName, B);
   double lut[256];
   for (int i = 0; i <= 255; i++)
     lut[i] = i/255.0;
@@ -415,58 +425,43 @@ void BgenClass::getOneMarker(uint64_t & t_gIndex_prev,
 
 
   char snpID[65536], rsID[65536], chrStr[65536];
-  unsigned int maxLA = 65536, maxLB = 65536;
-  char *allele1, *allele0;
-  allele1 = (char *) malloc(maxLA+1);
-  allele0 = (char *) malloc(maxLB+1);
   uint16_t LS; size_t numBoolRead = fread(&LS, 2, 1, m_fin); // cout << "LS: " << LS << " " << std::flush;
   // bool isBoolRead;  // BWJ (2021-02-28): I think it will not be used since we currently use t_gIndex to specify bytes position. This bool value can still be outputted through a reference. If we are sure it is not useful any more, we can remove it.
   //Rcpp::List result ;
   if ( numBoolRead > 0 ) {
     // isBoolRead = true;
     t_isBoolRead = true;
-    fread(snpID, 1, LS, m_fin); snpID[LS] = '\0'; // 
-    ushort LR; fread(&LR, 2, 1, m_fin); // cout << "LR: " << LR << " " << std::flush;
-    fread(rsID, 1, LR, m_fin); rsID[LR] = '\0'; // cout << "rsID: " << string(rsID) << " " << std::flush;
+    read_exact(m_fin, snpID, LS, "a variant ID"); snpID[LS] = '\0'; // 
+    ushort LR; read_exact(m_fin, &LR, 2, "an rsID length"); // cout << "LR: " << LR << " " << std::flush;
+    read_exact(m_fin, rsID, LR, "an rsID"); rsID[LR] = '\0'; // cout << "rsID: " << string(rsID) << " " << std::flush;
     RSID = std::string(rsID)=="." ? snpID : rsID;
     //std::string SNPID = string(snpID);
     
-    ushort LC; fread(&LC, 2, 1, m_fin); // cout << "LC: " << LC << " " << std::flush;
-    fread(chrStr, 1, LC, m_fin); chrStr[LC] = '\0';
+    ushort LC; read_exact(m_fin, &LC, 2, "a chromosome length"); // cout << "LC: " << LC << " " << std::flush;
+    read_exact(m_fin, chrStr, LC, "a chromosome"); chrStr[LC] = '\0';
     chromosome  = std::string(chrStr);
     
-    uint physpos; fread(&physpos, 4, 1, m_fin); // cout << "physpos: " << physpos << " " << std::flush;
+    uint physpos; read_exact(m_fin, &physpos, 4, "a position"); // cout << "physpos: " << physpos << " " << std::flush;
     position = physpos;
-    uint K; 
-    fread(&K, 2, 1, m_fin); 
-    //if (K != 2) {
-    //  std::cerr << "ERROR: Non-bi-allelic variant found: " << K << " alleles" << std::endl;
-    //  exit(1);
-   // }
-    uint LA; fread(&LA, 4, 1, m_fin); // cout << "LA: " << LA << " " << std::flush;
-    if (LA > maxLA) {
-      maxLA = 2*LA;
-      free(allele1);
-      allele1 = (char *) malloc(maxLA+1);
-    }
-    fread(allele1, 1, LA, m_fin); allele1[LA] = '\0';
-    first_allele = std::string(allele1);
-    free(allele1);
-    uint LB; fread(&LB, 4, 1, m_fin); // cout << "LB: " << LB << " " << std::flush;
-    if (LB > maxLB) {
-      maxLB = 2*LB;
-      free(allele0);
-      allele0 = (char *) malloc(maxLB+1);
-    }
-    fread(allele0, 1, LB, m_fin); allele0[LB] = '\0';
-    second_allele = std::string(allele0);
-    free(allele0);
-    uint C; fread(&C, 4, 1, m_fin); //cout << "C: " << C << endl;
+    uint16_t K; 
+    read_exact(m_fin, &K, 2, "a number of alleles"); 
+    if (K != 2)
+      Rcpp::stop("BGEN variant %s has %d alleles: only bi-allelic variants are supported.", RSID, K);
+    uint LA; read_exact(m_fin, &LA, 4, "an allele length"); // cout << "LA: " << LA << " " << std::flush;
+    first_allele = read_string(m_fin, LA, "an allele");
+    uint LB; read_exact(m_fin, &LB, 4, "an allele length"); // cout << "LB: " << LB << " " << std::flush;
+    second_allele = read_string(m_fin, LB, "an allele");
+    uint C; read_exact(m_fin, &C, 4, "a compressed length"); //cout << "C: " << C << endl;
+    if (C <= 4 || C > bytes_left(m_fin))  // C counts D and the compressed data
+      Rcpp::stop("The BGEN file is truncated or malformed: variant %s has compressed length %d, outside the rest of the file.", RSID, C);
     if (C > m_zBuf.size()) m_zBuf.resize(C-4);
     //std::cout << "m_zBuf.size() " << m_zBuf.size() << std::endl;
-    uint D; fread(&D, 4, 1, m_fin); //cout << "D: " << D << endl;
+    uint D; read_exact(m_fin, &D, 4, "an uncompressed length"); //cout << "D: " << D << endl;
+    uint64_t expectedD = 10 + 3 * (uint64_t)m_N0;  // the only encoding Parse2 decodes: 8-bit unphased diploid bi-allelic
+    if (D != expectedD)
+      Rcpp::stop("BGEN variant %s has probability data length %d, not %d (8-bit unphased diploid bi-allelic data).", RSID, D, expectedD);
     m_zBufLens = C-4; m_bufLens = D;
-    fread(&m_zBuf[0], 1, C-4, m_fin);
+    read_exact(m_fin, &m_zBuf[0], C-4, "compressed genotype probabilities");
     AC = 0;
     AF = 0;
     info = 0;
@@ -508,10 +503,8 @@ void BgenClass::getOneMarker(uint64_t & t_gIndex_prev,
     }
     
   }else{
-    // isBoolRead = false;
-    t_isBoolRead = false;
-    // Rcpp::DataFrame variants = NULL;
-    // result["isBoolRead"] = isBoolRead;
+    // the R callers pass index offsets, so a missing record means the file is truncated or does not match its index
+    Rcpp::stop("The BGEN file is truncated: no variant at byte %d.", t_gIndex);
   }
 
 
