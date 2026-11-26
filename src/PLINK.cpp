@@ -27,7 +27,9 @@ PlinkClass::PlinkClass(std::string t_bimFile,
                        //std::vector<std::string> t_SampleInModel,
                        std::string t_AlleleOrder)
 {
-  setPlinkobj(t_bimFile, t_famFile, t_bedFile);
+  try {
+    setPlinkobj(t_bimFile, t_famFile, t_bedFile);
+  } catch (...) { closegenofile(); throw; }  // a throwing constructor never runs the destructor
   //setPosSampleInPlink(t_SampleInModel);
   m_AlleleOrder = t_AlleleOrder;
 }
