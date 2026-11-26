@@ -50,11 +50,10 @@ void PlinkClass::setPlinkobj(std::string t_bimFile,
   readFamFile();
   
   m_fin = fopen(t_bedFile.c_str(), "rb");
-  char magicNumber_2[65536]; 
-  fread(magicNumber_2, 2, 1, m_fin);
-  char magicNumber3;
-  fread(&magicNumber3, 1, 1, m_fin);
-  fseek(m_fin, 3, SEEK_SET);    
+  if(!m_fin)
+    Rcpp::stop("Cannot open the plink bed file %s.", t_bedFile);
+  char magicNumber[3];
+  bool isMagicRead = fread(magicNumber, 1, 3, m_fin) == 3;
 
 /* 
   m_ibedFile.open(m_bedFile.c_str(), std::ios::binary);
@@ -63,7 +62,7 @@ void PlinkClass::setPlinkobj(std::string t_bimFile,
   m_ibedFile.read(&magicNumber3, 1);
 */
 
-  if(magicNumber3 != 1)
+  if(!isMagicRead || magicNumber[2] != 1)
     Rcpp::stop("The third magic number of the plink bed file is not 00000001. Please use SNP-major plink (plink version >= 1.9) files.");
 }
 
@@ -71,6 +70,8 @@ void PlinkClass::readBimFile()
 {
   std::cout << "Reading bim file...." << std::endl;
   std::ifstream bim(m_bimFile);
+  if(!bim)
+    Rcpp::stop("Cannot open the plink bim file %s.", m_bimFile);
   m_M0 = 0;
   std::string line;
   
@@ -78,6 +79,8 @@ void PlinkClass::readBimFile()
     m_M0++;
     std::vector<std::string> line_elements;
     boost::split(line_elements, line, boost::is_any_of("\t "));
+    if(line_elements.size() < 6)
+      Rcpp::stop("Line %d of the plink bim file %s has fewer than 6 columns.", m_M0, m_bimFile);
     boost::replace_all(line_elements[line_elements.size() - 1], "\r", "");
     
     m_chr.push_back(line_elements[0]);
@@ -96,12 +99,16 @@ void PlinkClass::readFamFile()
 {
   std::cout << "Reading fam file...." << std::endl;
   std::ifstream fam(m_famFile);
+  if(!fam)
+    Rcpp::stop("Cannot open the plink fam file %s.", m_famFile);
   m_N0 = 0;
   std::string line;
   while(getline(fam, line)){
     m_N0 ++;
     std::vector<std::string> line_elements;
     boost::split(line_elements, line, boost::is_any_of("\t "));
+    if(line_elements.size() < 2)
+      Rcpp::stop("Line %d of the plink fam file %s has fewer than 2 columns.", m_N0, m_famFile);
     m_SampleInPlink.push_back(line_elements[1]);  // put IID to m_SampleInPlink
   }
   m_N = m_N0;
@@ -218,7 +225,8 @@ void PlinkClass::getOneMarker(uint64_t & t_gIndex_prev,
   */
   //m_ibedFile.seekg(posSeek);
   //m_ibedFile.read((char*)(&m_OneMarkerG4[0]), m_numBytesofEachMarker0);
-  fread((char*)(&m_OneMarkerG4[0]), 1, m_numBytesofEachMarker0 , m_fin);
+  if(fread((char*)(&m_OneMarkerG4[0]), 1, m_numBytesofEachMarker0 , m_fin) != m_numBytesofEachMarker0)
+    Rcpp::stop("The plink bed file %s is truncated: it ends before marker %d.", m_bedFile, t_gIndex + 1);
 
   t_indexForMissing.clear();
   t_indexForNonZero.clear();
