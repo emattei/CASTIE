@@ -73,11 +73,12 @@ BEGIN_RCPP
 END_RCPP
 }
 // closeOutfile_single_LDmat
-void closeOutfile_single_LDmat();
-RcppExport SEXP _CASTIE_closeOutfile_single_LDmat() {
+void closeOutfile_single_LDmat(bool t_commit);
+RcppExport SEXP _CASTIE_closeOutfile_single_LDmat(SEXP t_commitSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
-    closeOutfile_single_LDmat();
+    Rcpp::traits::input_parameter< bool >::type t_commit(t_commitSEXP);
+    closeOutfile_single_LDmat(t_commit);
     return R_NilValue;
 END_RCPP
 }
@@ -528,21 +529,22 @@ END_RCPP
 }
 
 // closeOutfile_single
-void closeOutfile_single();
-RcppExport SEXP _CASTIE_closeOutfile_single() {
+void closeOutfile_single(bool t_commit);
+RcppExport SEXP _CASTIE_closeOutfile_single(SEXP t_commitSEXP) {
 BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    closeOutfile_single();
+    Rcpp::traits::input_parameter< bool >::type t_commit(t_commitSEXP);
+    closeOutfile_single(t_commit);
     return R_NilValue;
 END_RCPP
 }
 // close_region_outfiles
-void close_region_outfiles();
-RcppExport SEXP _CASTIE_close_region_outfiles() {
+void close_region_outfiles(bool t_commit);
+RcppExport SEXP _CASTIE_close_region_outfiles(SEXP t_commitSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
-    close_region_outfiles();
+    Rcpp::traits::input_parameter< bool >::type t_commit(t_commitSEXP);
+    close_region_outfiles(t_commit);
     return R_NilValue;
 END_RCPP
 }
@@ -2681,7 +2683,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CASTIE_setGlobalVarsInCPP_LDmat", (DL_FUNC) &_CASTIE_setGlobalVarsInCPP_LDmat, 10},
     {"_CASTIE_LDmatRegionInCPP", (DL_FUNC) &_CASTIE_LDmatRegionInCPP, 9},
     {"_CASTIE_openOutfile_single_LDmat", (DL_FUNC) &_CASTIE_openOutfile_single_LDmat, 1},
-    {"_CASTIE_closeOutfile_single_LDmat", (DL_FUNC) &_CASTIE_closeOutfile_single_LDmat, 0},
+    {"_CASTIE_closeOutfile_single_LDmat", (DL_FUNC) &_CASTIE_closeOutfile_single_LDmat, 1},
     {"_CASTIE_setAssocTest_GlobalVarsInCPP", (DL_FUNC) &_CASTIE_setAssocTest_GlobalVarsInCPP, 9},
     {"_CASTIE_setGxEModelCondInCPP", (DL_FUNC) &_CASTIE_setGxEModelCondInCPP, 4},
     {"_CASTIE_setAssocTest_GlobalVarsInCPP_GbyE", (DL_FUNC) &_CASTIE_setAssocTest_GlobalVarsInCPP_GbyE, 13},
@@ -2711,8 +2713,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CASTIE_removeOutfile_inGroup", (DL_FUNC) &_CASTIE_removeOutfile_inGroup, 0},
     {"_CASTIE_removeOutfile_inSingle", (DL_FUNC) &_CASTIE_removeOutfile_inSingle, 0},
     {"_CASTIE_openOutfile_single", (DL_FUNC) &_CASTIE_openOutfile_single, 5},
-    {"_CASTIE_closeOutfile_single", (DL_FUNC) &_CASTIE_closeOutfile_single, 0},
-    {"_CASTIE_close_region_outfiles", (DL_FUNC) &_CASTIE_close_region_outfiles, 0},
+    {"_CASTIE_closeOutfile_single", (DL_FUNC) &_CASTIE_closeOutfile_single, 1},
+    {"_CASTIE_close_region_outfiles", (DL_FUNC) &_CASTIE_close_region_outfiles, 1},
     {"_CASTIE_set_flagSparseGRM_cur_SAIGE", (DL_FUNC) &_CASTIE_set_flagSparseGRM_cur_SAIGE, 1},
     {"_CASTIE_set_flagSparseGRM_cur_SAIGE_org", (DL_FUNC) &_CASTIE_set_flagSparseGRM_cur_SAIGE_org, 0},
     {"_CASTIE_copy_singleInGroup", (DL_FUNC) &_CASTIE_copy_singleInGroup, 0},

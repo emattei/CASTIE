@@ -3,6 +3,9 @@
 #include <RcppArmadillo.h>
 #include "UTIL.hpp"
 #include <sys/time.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 
 arma::vec nb(unsigned int n){
   return(Rcpp::rbinom(n,1,0.5));
@@ -218,5 +221,27 @@ double calculatePearsonCorrelation(arma::vec& x, arma::vec& y) {
 
     // Calculate Pearson correlation
     return covariance / (stddev_x * stddev_y);
+}
+
+std::string close_outfiles(std::vector<std::ofstream> & t_streams, std::vector<std::string> & t_names){
+  std::string failed;
+  for(unsigned int i = 0; i < t_streams.size(); i++){
+    if(t_streams.at(i).is_open()){
+      t_streams.at(i).flush();
+      t_streams.at(i).close();
+    }
+    if(t_streams.at(i).fail() && failed.empty() && i < t_names.size()){
+      failed = t_names.at(i);
+    }
+  }
+  t_streams.clear();
+  t_names.clear();
+  return failed;
+}
+
+void remove_temp_file(const std::string & t_file){
+  if(std::remove(t_file.c_str()) != 0 && errno != ENOENT){
+    Rcpp::Rcerr << "Could not remove the temp file " << t_file << ": " << std::strerror(errno) << std::endl;
+  }
 }
 

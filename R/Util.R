@@ -475,7 +475,8 @@ checkOutputFile <- function(OutputFile,
                             OutputFileIndex,
                             AnalysisType, ## "Marker" or "Region"
                             nEachChunk,
-                            isOverwriteOutput) {
+                            isOverwriteOutput,
+                            OutputPrefix) { # the destination prefix; OutputFile and OutputFileIndex are staged under it
   ## The following messages are for 'OutputFileIndex'
   message1 <- "This is the output index file for SAIGE package to record the end point in case users want to restart the analysis. Please do not modify this file."
   message2 <- paste("This is a", AnalysisType, "level analysis.")
@@ -489,6 +490,8 @@ checkOutputFile <- function(OutputFile,
   }
 
   if (isOverwriteOutput) {
+    # a fresh run drops the staged files of an earlier one; the destination stays until this run succeeds
+    unlink(stagedOutputFiles(OutputPrefix))
     Check_OutputFile_Create(OutputFile)
     # Check_OutputFile_Create(OutputFileIndex)
     Start <- TRUE
@@ -498,6 +501,12 @@ checkOutputFile <- function(OutputFile,
       indexChunk <- 1
     }
   } else {
+    # nothing staged: results at the destination were published, which only a finished run does
+    isPublished <- !file.exists(OutputFile) && file.exists(publishedOutputFile(OutputFile, OutputPrefix))
+    if (isPublished) {
+      OutputFile <- publishedOutputFile(OutputFile, OutputPrefix)
+      OutputFileIndex <- publishedOutputFile(OutputFileIndex, OutputPrefix)
+    }
     if (file.exists(OutputFile)) {
       if (!file.exists(OutputFileIndex)) {
         stop(paste0("'OutputFile' of '", OutputFile, "' has existed.
@@ -517,6 +526,11 @@ checkOutputFile <- function(OutputFile,
           indexChunk <- outIndexData[nrow(outIndexData) - 1, 1]
           indexChunk <- as.numeric(gsub("Have completed the analysis of chunk ", "", indexChunk))
           cat("Based on 'OutputFile' and 'OutputFileIndex', the analysis has been completed for the toal", indexChunk, "chunks.\n")
+        } else if (isPublished) {
+          # a Region index need not end with message5; Inf runs no chunk
+          End <- TRUE
+          indexChunk <- Inf
+          cat("Based on 'OutputFile' and 'OutputFileIndex', the analysis has been completed.\n")
         } else {
           End <- FALSE
           indexChunk <- lastMessage
@@ -540,6 +554,35 @@ checkOutputFile <- function(OutputFile,
 
   returnList <- list(Start = Start, End = End, indexChunk = indexChunk)
   return(returnList)
+}
+
+
+# Staged outputs: a run writes '<prefix>.partial*' and renames each file onto '<prefix>*' only when it succeeds.
+stagedOutputFiles <- function(OutputPrefix) {
+  files <- list.files(dirname(OutputPrefix), full.names = TRUE)
+  files[startsWith(basename(files), paste0(basename(OutputPrefix), ".partial"))]
+}
+
+publishedOutputFile <- function(stagedFile, OutputPrefix) {
+  paste0(OutputPrefix, substring(basename(stagedFile), nchar(basename(OutputPrefix)) + nchar(".partial") + 1))
+}
+
+# Renames each file onto its destination, one atomic rename per file; a failure names the files already published.
+publishOutputFiles <- function(from, to) {
+  for (k in seq_along(from)) {
+    if (!file.rename(from[k], to[k])) {
+      stop(
+        "Could not publish '", from[k], "' as '", to[k], "'. Already published: ",
+        if (k > 1) paste(to[seq_len(k - 1)], collapse = ", ") else "none"
+      )
+    }
+  }
+}
+
+publishStagedOutputFiles <- function(OutputPrefix) {
+  staged <- stagedOutputFiles(OutputPrefix)
+  staged <- staged[order(endsWith(staged, ".index"))] # the index last: a published index marks the run finished
+  publishOutputFiles(staged, publishedOutputFile(staged, OutputPrefix))
 }
 
 

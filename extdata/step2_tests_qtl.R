@@ -419,7 +419,8 @@ if (opt$output_format == "parquet") {
   if (out_dir == ".") out_dir <- getwd()
   all_files  <- list.files(out_dir, full.names = TRUE)
   candidates <- all_files[startsWith(basename(all_files), out_base)]
-  candidates <- candidates[!grepl("\\.(index|bin|parquet)$", candidates)]
+  # staged (.partial) files belong to an unfinished run, this one's Parquet or another output with this prefix
+  candidates <- candidates[!grepl("\\.(index|bin|parquet)$|\\.partial", substring(basename(candidates), nchar(out_base) + 1))]
   for (f in candidates) {
     output_size <- file.info(f)$size
     if (is.na(output_size) || output_size == 0) {
@@ -434,10 +435,13 @@ if (opt$output_format == "parquet") {
       stop("Association output could not be parsed before Parquet conversion: ", f)
     }
     out_pq <- paste0(sub("\\.txt$", "", f), ".parquet")
-    arrow::write_parquet(dt, out_pq)
-    file.remove(f)
+    arrow::write_parquet(dt, paste0(out_pq, ".partial"))
     cat("Converted", basename(f), "->", basename(out_pq), "\n")
   }
+  # publish every Parquet file, then drop the text results and index they replace
+  out_pq <- paste0(sub("\\.txt$", "", candidates), ".parquet")
+  publishOutputFiles(paste0(out_pq, ".partial"), out_pq)
+  file.remove(candidates)
   idx <- paste0(opt$SAIGEOutputFile, ".index")
   if (file.exists(idx)) file.remove(idx)
 }
