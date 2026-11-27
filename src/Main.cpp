@@ -1102,9 +1102,11 @@ void mainMarkerInCPP(
            arma::uvec nonMissingPvalVecIndforCCT = arma::find(pval_c_ge_double_vec >= 0);
            arma::vec nonMissingPvalVecforCCT = pval_c_ge_double_vec.elem(nonMissingPvalVecIndforCCT);
            double cctpval = CCT_cpp(nonMissingPvalVecforCCT);
+           if(!std::isnan(cctpval)){ // no valid p-value: keep "NA"
            char pValueBuf2[100];
            sprintf(pValueBuf2, "%.6E", cctpval);
            pval_SKAT_ge_cVec.at(j_mt) = pValueBuf2;
+           }
 	}
 	//arma::vec r_corr = {1.000};
         //std::cout << "HEREa6" << std::endl;
@@ -3017,7 +3019,7 @@ for(unsigned int i_mt = 0; i_mt < t_traitType.size(); i_mt++){
 		if(ptr_gSAIGEobj->m_flagSparseGRM_cur){
 			iswriteOutput = true;
 		}else{
-		  if(cctpval >= 0.1){
+		  if(std::isnan(cctpval) || cctpval >= 0.1){ // empty set is written now, as before
 			iswriteOutput = true;
 		  } 	
 		}
@@ -4177,10 +4179,10 @@ void writeOutfile_BURDEN(std::string regionName,
   } 
      OutFile << regionName;
      OutFile << "\tCauchy\tNA\t";
-     OutFile << cctpval;
+     if(std::isnan(cctpval)) OutFile << "NA"; else OutFile << cctpval;
      OutFile << "\tNA\tNA\t";	
      if(isCondition){
-	OutFile << cctpval_cond;
+	if(std::isnan(cctpval_cond)) OutFile << "NA"; else OutFile << cctpval_cond;
 	OutFile << "\tNA\tNA\t";
      }
      OutFile << "NA\t";
