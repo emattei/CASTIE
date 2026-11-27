@@ -24,8 +24,9 @@ SAIGE.Marker <- function(
 
   # genoType = objGeno$genoType
 
-  outIndex <- checkOutputFile(OutputFile, OutputFileIndex, "Marker", format(nMarkersEachChunk, scientific = F), isOverWriteOutput) # this function is in 'Util.R'
-  outIndex <- outIndex$indexChunk
+  outList <- checkOutputFile(OutputFile, OutputFileIndex, "Marker", format(nMarkersEachChunk, scientific = F), isOverWriteOutput) # this function is in 'Util.R'
+  # a restart gets the last completed chunk, so resume at the next one
+  outIndex <- if (outList$Start) 1 else outList$indexChunk + 1
   isappend <- FALSE
   if (outIndex != 1) {
     cat("Restart the analysis from chunk:\t", outIndex, "\n")
@@ -103,11 +104,15 @@ SAIGE.Marker <- function(
         set_iterator_inVcf("", chrom, 1, 250000000)
       }
     }
-    if (outIndex > 1) {
-      move_forward_iterator_Vcf(outIndex * nMarkersEachChunk)
+    # the iterator has no end check, so a finished run must not move it
+    if (outIndex > 1 && !outList$End) {
+      move_forward_iterator_Vcf((outIndex - 1) * nMarkersEachChunk)
     }
     isVcfEnd <- check_Vcf_end()
-    if (!isVcfEnd) {
+    if (outList$End) {
+      cat("The analysis has been finished! Please delete ", OutputFileIndex, " if the analysis needs to be run again or set --is_overwrite_output=TRUE\n")
+      is_marker_test <- FALSE
+    } else if (!isVcfEnd) {
       # outIndex = 1
       genoIndex <- rep("0", nMarkersEachChunk)
       genoIndex_prev <- rep("0", nMarkersEachChunk)
