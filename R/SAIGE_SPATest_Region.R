@@ -270,7 +270,8 @@ SAIGE.Region <- function(mu,
   # cat("indexChunk ", indexChunk, "\n")
   # cat("nRegions ", nRegions, "\n")
   pval.Region.all <- NULL
-  pval.Region.all.list <- list()
+  # each trait's region rows for the current chunk, written and reset when the chunk ends
+  pval.Region.all.list <- vector("list", length(traitType))
 
   OutList.all <- NULL
   Output_MarkerList.all <- NULL
@@ -1225,7 +1226,7 @@ SAIGE.Region <- function(mu,
             }
             gc()
           } # if(length(noNAIndices) > 0){
-          pval.Region.all.list[[tt]] <- pval.Region.all
+          pval.Region.all.list[tt] <- list(rbind(pval.Region.all.list[[tt]], pval.Region.all))
           pval.Region.all <- NULL
         } ## for(tt in 1:length(traitType)){
       } else { # if(!is.null(region)){
@@ -1289,6 +1290,7 @@ SAIGE.Region <- function(mu,
           cth_chunk_to_output <- cth_chunk_to_output + 1
           gc()
         } # for(tt in 1:length(traitType)){
+        pval.Region.all.list <- vector("list", length(traitType))
 
         # if(FALSE){
         # print("write Output 2")
