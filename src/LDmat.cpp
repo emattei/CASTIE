@@ -99,6 +99,7 @@ void LDmatRegionInCPP(
                            std::vector<std::string> & annoStringVec,
                            std::string regionName) 
 {
+  TempFileGuard chunk_files; // the .bin chunk files below, removed also when this call throws
   //create the output list
   //arma::vec timeoutput1 = getTime();
   unsigned int q0 = t_genoIndex.size();                 // number of markers (before QC) in one region
@@ -220,7 +221,7 @@ void LDmatRegionInCPP(
 	arma::ivec value_P1Mat_arma =  arma::conv_to<arma::ivec>::from(value_P1Mat);
 	arma::sp_imat P1Mat(location_P1Mat_arma, value_P1Mat_arma, i1InChunk, t_n);
 
-	P1Mat.save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + ".bin");
+	save_temp_matrix(P1Mat, t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + ".bin", chunk_files);
 	value_P1Mat.clear();
 	location_m_P1Mat.clear();
 	location_n_P1Mat.clear();
@@ -247,7 +248,7 @@ void LDmatRegionInCPP(
        
        	arma::ivec value_P1Mat_arma =  arma::conv_to<arma::ivec>::from(value_P1Mat);
         arma::sp_imat P1Mat(location_P1Mat_arma, value_P1Mat_arma, i1InChunk, t_n);
-        P1Mat.save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + ".bin");
+        save_temp_matrix(P1Mat, t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + ".bin", chunk_files);
         value_P1Mat.clear();
         location_m_P1Mat.clear();
         location_n_P1Mat.clear();
@@ -327,16 +328,17 @@ void LDmatRegionInCPP(
     {
       std::string P1MatFile = t_outputFile + "_P1Mat_Chunk_" + std::to_string(index1) + ".bin";
       //std::string P2MatFile = t_outputFile + "_P2Mat_Chunk_" + std::to_string(index1) + ".bin";
-      const char* File1 = P1MatFile.c_str();
       //const char* File2 = P2MatFile.c_str();
-      std::remove(File1);
+      remove_temp_file(P1MatFile);
       //std::remove(File2);
     }
 
   }
 
   //VarMat.print("VarMat");
-  VarMat.save(t_outputFile + "_"+regionName+".txt", arma::coord_ascii);
+  if(!VarMat.save(t_outputFile + "_"+regionName+".txt", arma::coord_ascii)){
+    Rcpp::stop("Could not write the output file " + t_outputFile + "_" + regionName + ".txt");
+  }
   VarMat.clear();
 
   writeOutfile_single_LDmat(chrVec,
@@ -394,7 +396,7 @@ void writeOutfile_single_LDmat(
 bool openOutfile_single_LDmat(bool isappend){
       bool isopen;
       // A stream left open by a failed run would make open() fail; close it first.
-      closeOutfile_single_LDmat();
+      closeOutfile_single_LDmat(false);
       if(!isappend){
         OutFile_single_LDmat.open(g_outputFilePrefixSingle_LDmat.c_str());
 	isopen = OutFile_single_LDmat.is_open();
@@ -410,8 +412,10 @@ bool openOutfile_single_LDmat(bool isappend){
 
 
 // [[Rcpp::export]]
-void closeOutfile_single_LDmat(){
+void closeOutfile_single_LDmat(bool t_commit = false){
   if(OutFile_single_LDmat.is_open()){
     OutFile_single_LDmat.close();
+    // only the success close (t_commit) raises: a close on failure must not replace the error that caused it
+    if(t_commit && OutFile_single_LDmat.fail()) Rcpp::stop("Could not write the output file " + g_outputFilePrefixSingle_LDmat);
   }
 }

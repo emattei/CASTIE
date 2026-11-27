@@ -49,5 +49,5 @@ void writeOutfile_single_LDmat(
 
 bool openOutfile_single_LDmat(bool isappend);
 
-void closeOutfile_single_LDmat();
+void closeOutfile_single_LDmat(bool t_commit);
 #endif

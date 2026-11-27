@@ -29,7 +29,8 @@ generate_LDMat_forMataRegion <- function(bgenFile = "",
                                          maxMAF_in_groupTest = 0.5,
                                          is_overwrite_output = TRUE,
                                          sampleFile_include_inLDMat = "") {
-  OutputFile <- SAIGEOutputFile
+  # Write to staged files beside the destination, published below only on success; a restart resumes them.
+  OutputFile <- paste0(SAIGEOutputFile, ".partial")
   OutputFileIndex <- NULL
   if (is.null(OutputFileIndex)) {
     OutputFileIndex <- paste0(OutputFile, ".index")
@@ -48,7 +49,7 @@ generate_LDMat_forMataRegion <- function(bgenFile = "",
     min_MAC,
     min_Info,
     markers_per_chunk_in_groupTest,
-    SAIGEOutputFile
+    OutputFile
   )
 
   if (sampleFile_include_inLDMat != "") {
@@ -95,7 +96,8 @@ generate_LDMat_forMataRegion <- function(bgenFile = "",
     is_overwrite_output
   )
 
-  closeOutfile_single_LDmat()
+  closeOutfile_single_LDmat(TRUE)
+  publishStagedOutputFiles(SAIGEOutputFile)
 }
 
 
@@ -118,7 +120,8 @@ SAIGE.Region.LDmat <- function(OutputFile,
   if (is.null(OutputFileIndex)) {
     OutputFileIndex <- paste0(OutputFile, ".index")
   }
-  outList <- checkOutputFile(paste0(OutputFile, ".marker_info.txt"), OutputFileIndex, "Region", 1, isOverWriteOutput) # Check 'Util.R'
+  # OutputFile is the staged prefix set by generate_LDMat_forMataRegion
+  outList <- checkOutputFile(paste0(OutputFile, ".marker_info.txt"), OutputFileIndex, "Region", 1, isOverWriteOutput, sub("\\.partial$", "", OutputFile)) # Check 'Util.R'
 
   indexChunk <- outList$indexChunk
   Start <- outList$Start

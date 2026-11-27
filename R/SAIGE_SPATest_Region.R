@@ -111,12 +111,12 @@ SAIGE.Region <- function(mu,
   cat("maxMAFlist ", maxMAFlist, "\n")
   cat("minMAFlist ", minMAFlist, "\n")
 
-  OutputFileIndex <- NULL
-  if (is.null(OutputFileIndex)) {
-    OutputFileIndex <- paste0(OutputFile, ".index")
-  }
+  # Write to staged files beside the destination and publish them only on success; a restart resumes them.
+  OutputPrefix <- OutputFile
+  OutputFile <- paste0(OutputPrefix, ".partial")
+  OutputFileIndex <- paste0(OutputFile, ".index")
 
-  outList <- checkOutputFile(OutputFile, OutputFileIndex, "Region", 1, isOverWriteOutput) # Check 'Util.R'
+  outList <- checkOutputFile(OutputFile, OutputFileIndex, "Region", 1, isOverWriteOutput, OutputPrefix) # Check 'Util.R'
 
   cat("traitType ", traitType, "\n")
 
@@ -131,8 +131,9 @@ SAIGE.Region <- function(mu,
 
 
   if (End) {
+    publishStagedOutputFiles(OutputPrefix) # a finished run stopped before it published
     message <- paste0(
-      "The analysis has been completed in earlier analysis. Results are saved in '", OutputFile, "'. ",
+      "The analysis has been completed in earlier analysis. Results are saved in '", OutputPrefix, "'. ",
       "If you want to change parameters and restart the analysis, please use another 'OutputFile'."
     )
     return(message)
@@ -1317,7 +1318,7 @@ SAIGE.Region <- function(mu,
     }
   }
 
-  close_region_outfiles()
+  close_region_outfiles(TRUE)
   streams_open <- FALSE
 
   message <- paste0(
@@ -1329,9 +1330,9 @@ SAIGE.Region <- function(mu,
 
   for (itt in 1:length(traitType)) {
     if (length(traitType) == 1) {
-      OutputFile_itt <- OutputFile
+      OutputFile_itt <- OutputPrefix
     } else {
-      OutputFile_itt <- paste0(OutputFile, "_", phenotype_name_vec[itt])
+      OutputFile_itt <- paste0(OutputPrefix, "_", phenotype_name_vec[itt])
     }
 
 
@@ -1361,7 +1362,7 @@ SAIGE.Region <- function(mu,
     }
   }
 
-
+  publishStagedOutputFiles(OutputPrefix)
   return(message)
 }
 

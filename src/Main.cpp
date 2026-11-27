@@ -127,6 +127,10 @@ std::vector<std::ofstream> OutFile_single_vec;
 std::vector<std::ofstream> OutFile_vec;
 std::vector<std::ofstream> OutFile_singleInGroup_vec;
 std::vector<std::ofstream> OutFile_singleInGroup_temp_vec;
+// file names of the streams above, filled at open, so a write failure can name its file
+std::vector<std::string> outfile_single_names;
+std::vector<std::string> outfile_region_names;
+std::vector<std::string> outfile_single_in_group_names;
 
 
 std::string g_outputFilePrefix0;
@@ -1642,6 +1646,7 @@ Rcpp::List mainRegionInCPP(
 
 
   std::cout << "mainRegion" << std::endl;
+  TempFileGuard chunk_files; // the .bin chunk files below, removed also when this call throws
 
   //create the output list
   Rcpp::List OutList = Rcpp::List::create();
@@ -2274,8 +2279,8 @@ for(unsigned int r = 0; r < q_weight; r++){
         P1Matsub = P1Mat.rows(i_mt*m1, i_mt*m1 + i1InChunk_vec(i_mt) -1);
 	P2Matsub = P2Mat.cols(i_mt*m1, i_mt*m1 + i1InChunk_vec(i_mt) -1);
         //std::cout << "ichunk " << ichunk << "i_mt " << i_mt << std::endl;
-	P1Matsub.save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt)+".bin");
-	P2Matsub.save(t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk_vec(i_mt))  + "_trait_"+std::to_string(i_mt) + ".bin");
+	save_temp_matrix(P1Matsub, t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt)+".bin", chunk_files);
+	save_temp_matrix(P2Matsub, t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk_vec(i_mt))  + "_trait_"+std::to_string(i_mt) + ".bin", chunk_files);
         //P1Mat.save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + ".bin");
         //P2Mat.save(t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk) + ".bin");
         //P1Mat.rows(i_mt*q_multTrait, i_mt*q_multTrait + i1InChunk -1).save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + "_trait_"+std::to_string(i_mt)+".bin");
@@ -2314,10 +2319,10 @@ for(unsigned int r = 0; r < q_weight; r++){
 
 	P1Matsub = P1Mat.rows(i_mt*m1, i_mt*m1 + i1InChunk_vec(i_mt) -1);
         //std::cout << "ichunk " << ichunk_vec(i_mt) << "i_mt " << i_mt << std::endl;
-        P1Matsub.save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin");
+        save_temp_matrix(P1Matsub, t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin", chunk_files);
         //P1Mat.rows(i_mt*q_multTrait, i_mt*q_multTrait + i1InChunk -1).save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + "_trait_"+std::to_string(i_mt) + ".bin");
 	P2Matsub = P2Mat.cols(i_mt*m1, i_mt*m1 + i1InChunk_vec(i_mt) -1);
-	P2Matsub.save(t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin");
+	save_temp_matrix(P2Matsub, t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin", chunk_files);
 	//P2Mat.cols(i_mt*q_multTrait, i_mt*q_multTrait + i1InChunk -1).save(t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk) + "_trait_"+std::to_string(i_mt) + ".bin");
     if(i_mt == 0){
     	mPassCVVec.push_back(i1InChunk_vec(0));
@@ -2629,8 +2634,8 @@ if(i2 > 0){
       P1Matsub = P1Mat.rows(i_mt*m1new, i_mt*m1new + i1InChunk_vec(i_mt) -1);
       P2Matsub = P2Mat.cols(i_mt*m1new, i_mt*m1new + i1InChunk_vec(i_mt) -1);
       //std::cout << "ichunk " << ichunk << "i_mt " << i_mt << std::endl;
-      P1Matsub.save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin");
-      P2Matsub.save(t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin");
+      save_temp_matrix(P1Matsub, t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin", chunk_files);
+      save_temp_matrix(P2Matsub, t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk_vec(i_mt)) + "_trait_"+std::to_string(i_mt) + ".bin", chunk_files);
       //P1Mat.rows(i_mt*m1new, i_mt*m1new + i1InChunk -1).save(t_outputFile + "_P1Mat_Chunk_" + std::to_string(ichunk) + "_trait_"+std::to_string(i_mt) + ".bin");
       //P2Mat.col(i_mt*m1new, i_mt*m1new + i1InChunk -1).save(t_outputFile + "_P2Mat_Chunk_" + std::to_string(ichunk) + "_trait_"+std::to_string(i_mt) + ".bin");
 	nchunks_vec(i_mt) = nchunks_vec(i_mt) + 1;
@@ -2750,10 +2755,8 @@ if(t_regionTestType != "BURDEN"){
     {
       std::string P1MatFile = t_outputFile + "_P1Mat_Chunk_" + std::to_string(index1) + "_trait_"+std::to_string(i_mt) + ".bin";
       std::string P2MatFile = t_outputFile + "_P2Mat_Chunk_" + std::to_string(index1) + "_trait_"+std::to_string(i_mt) + ".bin";
-      const char* File1 = P1MatFile.c_str();
-      const char* File2 = P2MatFile.c_str();
-      std::remove(File1);
-      std::remove(File2);
+      remove_temp_file(P1MatFile);
+      remove_temp_file(P2MatFile);
     }
     
     VarMat.submat(0, i_mt*i1, i1-1, ((i_mt+1)*i1-1)) = VarMatsub;	
@@ -3728,7 +3731,8 @@ bool openOutfile(std::string t_traitType, bool isappend){
 	isopen = OutFile.is_open();
      }
 
-     OutFile_vec.push_back(std::move(OutFile));	
+     OutFile_vec.push_back(std::move(OutFile));
+     outfile_region_names.push_back(g_outputFilePrefixGroup);
 
      return(isopen);
 }
@@ -3779,6 +3783,7 @@ bool openOutfile_singleinGroup(std::string t_traitType, bool t_isImputation, boo
        isopen = OutFile_singleInGroup.is_open();
     }
     OutFile_singleInGroup_vec.push_back(std::move(OutFile_singleInGroup));
+    outfile_single_in_group_names.push_back(g_outputFilePrefixSingleInGroup);
     OutFile_singleInGroup_temp_vec.push_back(std::move(OutFile_singleInGroup_temp));	
 
     //if(t_testType != "BURDEN" && t_isfastTest){
@@ -3790,23 +3795,20 @@ bool openOutfile_singleinGroup(std::string t_traitType, bool t_isImputation, boo
 
 // [[Rcpp::export]]
 void removeOutfile_singleinGroup_temp(){
-	const char* File1 = g_outputFilePrefixSingleInGroup_temp.c_str();
-	std::remove(File1);
+	remove_temp_file(g_outputFilePrefixSingleInGroup_temp);
 	std::cout << "remove temp file " << g_outputFilePrefixSingleInGroup_temp << std::endl;
 }
 
 
 // [[Rcpp::export]]
 void removeOutfile_inGroup(){
-	const char* File1 = g_outputFilePrefixGroup.c_str();
-	std::remove(File1);
+	remove_temp_file(g_outputFilePrefixGroup);
 }
 
 // [[Rcpp::export]]
 void removeOutfile_inSingle(){
 	 std::cout << "remove empty file " << g_outputFilePrefix0 << std::endl;
-	const char* File1 = g_outputFilePrefix0.c_str();
-	std::remove(File1);
+	remove_temp_file(g_outputFilePrefix0);
 }
 
 
@@ -3866,38 +3868,32 @@ bool openOutfile_single(std::string t_traitType, bool t_isImputation, bool isapp
         isopen = OutFile_single.is_open();
      }
      OutFile_single_vec.push_back(std::move(OutFile_single));
+     outfile_single_names.push_back(g_outputFilePrefixSingle);
      return(isopen);
 }
 
 
 // [[Rcpp::export]]
-void closeOutfile_single(){
+void closeOutfile_single(bool t_commit = false){
      // Step 2 keeps one stream per trait open while processing chunks.  Close
      // them explicitly before R validates the text output or converts it to
      // Parquet.  Clearing the vector also prevents a later SAIGE.Marker call
      // in the same R session from writing through stale stream entries.
-     for(std::ofstream & stream : OutFile_single_vec){
-          if(stream.is_open()){
-               stream.flush();
-               stream.close();
-          }
-     }
-     OutFile_single_vec.clear();
+     std::string failed = close_outfiles(OutFile_single_vec, outfile_single_names);
+     // only the success close (t_commit) raises: a close on failure must not replace the error that caused it
+     if(t_commit && !failed.empty()) Rcpp::stop("Could not write the output file " + failed);
 }
 
 
 // [[Rcpp::export]]
-void close_region_outfiles(){
+void close_region_outfiles(bool t_commit = false){
      // Region streams, closed and cleared like closeOutfile_single so a later SAIGE.Region opens its own.
-     for(std::vector<std::ofstream> * streams : {&OutFile_vec, &OutFile_singleInGroup_vec, &OutFile_singleInGroup_temp_vec}){
-          for(std::ofstream & stream : *streams){
-               if(stream.is_open()){
-                    stream.flush();
-                    stream.close();
-               }
-          }
-          streams->clear();
-     }
+     std::vector<std::string> temp_names; // not checked: the temp stream is closed after its first write
+     std::string failed = close_outfiles(OutFile_vec, outfile_region_names);
+     std::string failed_single = close_outfiles(OutFile_singleInGroup_vec, outfile_single_in_group_names);
+     close_outfiles(OutFile_singleInGroup_temp_vec, temp_names);
+     if(failed.empty()) failed = failed_single;
+     if(t_commit && !failed.empty()) Rcpp::stop("Could not write the output file " + failed);
 }
 
 
@@ -4081,6 +4077,8 @@ void writeOutfile_single(bool t_isMoreOutput,
   // can otherwise remain entirely in the C++ buffer when the Step 2 wrapper
   // calls fread() for validation or Parquet conversion.
   OutFile_single.flush();
+  // stop before R records the chunk as done in the index
+  if(OutFile_single.fail()) Rcpp::stop("Could not write the output file " + outfile_single_names.at(itt));
 
 
   //}  

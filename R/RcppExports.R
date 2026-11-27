@@ -17,8 +17,8 @@ openOutfile_single_LDmat <- function(isappend) {
     .Call('_CASTIE_openOutfile_single_LDmat', PACKAGE = 'CASTIE', isappend)
 }
 
-closeOutfile_single_LDmat <- function() {
-    invisible(.Call('_CASTIE_closeOutfile_single_LDmat', PACKAGE = 'CASTIE'))
+closeOutfile_single_LDmat <- function(t_commit = FALSE) {
+    invisible(.Call('_CASTIE_closeOutfile_single_LDmat', PACKAGE = 'CASTIE', t_commit))
 }
 
 setAssocTest_GlobalVarsInCPP <- function(t_impute_method, t_missing_cutoff, t_min_maf_marker, t_min_mac_marker, t_min_info_marker, t_dosage_zerod_cutoff, t_dosage_zerod_MAC_cutoff, t_outputFilePrefix, t_MACCutoffforER) {
@@ -137,12 +137,12 @@ openOutfile_single <- function(t_traitType, t_isImputation, isappend, t_isMoreOu
     .Call('_CASTIE_openOutfile_single', PACKAGE = 'CASTIE', t_traitType, t_isImputation, isappend, t_isMoreOutput, t_isGbyE)
 }
 
-closeOutfile_single <- function() {
-    invisible(.Call('_CASTIE_closeOutfile_single', PACKAGE = 'CASTIE'))
+closeOutfile_single <- function(t_commit = FALSE) {
+    invisible(.Call('_CASTIE_closeOutfile_single', PACKAGE = 'CASTIE', t_commit))
 }
 
-close_region_outfiles <- function() {
-    invisible(.Call('_CASTIE_close_region_outfiles', PACKAGE = 'CASTIE'))
+close_region_outfiles <- function(t_commit = FALSE) {
+    invisible(.Call('_CASTIE_close_region_outfiles', PACKAGE = 'CASTIE', t_commit))
 }
 
 set_flagSparseGRM_cur_SAIGE <- function(t_flagSparseGRM_cur) {

@@ -5,6 +5,7 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <RcppArmadillo.h>
 #include <sys/time.h>
+#include <fstream>
 
 const static std::unordered_map<std::string,int> string_to_case{
    {"best_guess",1},
@@ -59,5 +60,24 @@ double sum_arma1(arma::vec& X);
 double add_logp(double p1, double p2);
 
 double calculatePearsonCorrelation(arma::vec& x, arma::vec& y);
+
+// Flushes, closes and clears the streams; returns the first of t_names whose write, flush or close failed, else "".
+std::string close_outfiles(std::vector<std::ofstream> & t_streams, std::vector<std::string> & t_names);
+
+// Removes a temp file. A failure is reported on stderr, not raised; a file already gone is no failure.
+void remove_temp_file(const std::string & t_file);
+
+// Removes the recorded temp files on scope exit, so also when the call throws.
+struct TempFileGuard {
+  std::vector<std::string> files;
+  ~TempFileGuard(){ for(const std::string & file : files) remove_temp_file(file); }
+};
+
+// Saves a matrix to a temp file recorded in t_guard; a failed save raises an R error naming the file.
+template <typename T>
+void save_temp_matrix(const T & t_mat, const std::string & t_file, TempFileGuard & t_guard){
+  t_guard.files.push_back(t_file);
+  if(!t_mat.save(t_file)) Rcpp::stop("Could not write the temp file " + t_file);
+}
 #endif
 

@@ -18,13 +18,15 @@ SAIGE.Marker <- function(
   isAnyInclude,
   isGbyE
 ) {
-  if (is.null(OutputFileIndex)) {
-    OutputFileIndex <- paste0(OutputFile, ".index")
-  }
+  # Write to staged files beside the destination and publish them only on success; a restart resumes them.
+  # shortcut: a custom OutputFileIndex is ignored (the only caller passes '<OutputFile>.index').
+  OutputPrefix <- OutputFile
+  OutputFile <- paste0(OutputPrefix, ".partial")
+  OutputFileIndex <- paste0(OutputFile, ".index")
 
   # genoType = objGeno$genoType
 
-  outList <- checkOutputFile(OutputFile, OutputFileIndex, "Marker", format(nMarkersEachChunk, scientific = F), isOverWriteOutput) # this function is in 'Util.R'
+  outList <- checkOutputFile(OutputFile, OutputFileIndex, "Marker", format(nMarkersEachChunk, scientific = F), isOverWriteOutput, OutputPrefix) # this function is in 'Util.R'
   # a restart gets the last completed chunk, so resume at the next one
   outIndex <- if (outList$Start) 1 else outList$indexChunk + 1
   isappend <- FALSE
@@ -44,7 +46,8 @@ SAIGE.Marker <- function(
     },
     add = TRUE
   )
-  for (itt in 1:length(traitType)) {
+  # a finished run opens nothing: an append open would create an empty staged file, published over the results
+  if (!outList$End) for (itt in 1:length(traitType)) {
     if (length(traitType) > 1) {
       OutputFile_itt <- paste0(OutputFile, "_", phenotype_name_vec[itt])
     } else {
@@ -90,7 +93,7 @@ SAIGE.Marker <- function(
     cat("Number of markers in each chunk:\t", nMarkersEachChunk, "\n")
     cat("Number of chunks for all markers:\t", nChunks, "\n")
     if (outIndex > nChunks) {
-      cat("The analysis has been finished! Please delete ", OutputFileIndex, " if the analysis needs to be run again or set --is_overwrite_output=TRUE\n")
+      cat("The analysis has been finished! Please delete ", paste0(OutputPrefix, ".index"), " if the analysis needs to be run again or set --is_overwrite_output=TRUE\n")
       is_marker_test <- FALSE
     } else {
       is_marker_test <- TRUE
@@ -110,7 +113,7 @@ SAIGE.Marker <- function(
     }
     isVcfEnd <- check_Vcf_end()
     if (outList$End) {
-      cat("The analysis has been finished! Please delete ", OutputFileIndex, " if the analysis needs to be run again or set --is_overwrite_output=TRUE\n")
+      cat("The analysis has been finished! Please delete ", paste0(OutputPrefix, ".index"), " if the analysis needs to be run again or set --is_overwrite_output=TRUE\n")
       is_marker_test <- FALSE
     } else if (!isVcfEnd) {
       # outIndex = 1
@@ -229,23 +232,24 @@ SAIGE.Marker <- function(
   # fread() is called immediately after SAIGE.Marker returns.  Closing—not
   # merely flushing—the C++ streams guarantees that every final row and field
   # is visible and that Parquet conversion never observes a partial footer.
-  closeOutfile_single()
+  closeOutfile_single(TRUE)
   streams_open <- FALSE
 
   # information to users
 
   if (length(traitType) == 1) {
-    output <- paste0("Analysis done! The results have been saved to '", OutputFile, "'.")
+    output <- paste0("Analysis done! The results have been saved to '", OutputPrefix, "'.")
   } else {
     output <- "Analysis done! The results have been saved to"
     for (tt in 1:length(traitType)) {
-      OutputFile_tt <- paste0(OutputFile, "_", phenotype_name_vec[tt])
+      OutputFile_tt <- paste0(OutputPrefix, "_", phenotype_name_vec[tt])
       output <- paste0(output, "'", OutputFile_tt, "',")
     }
 
     assign_g_outputFilePrefix0(OutputFile)
     removeOutfile_inSingle()
   }
+  publishStagedOutputFiles(OutputPrefix)
   return(output)
 }
 
