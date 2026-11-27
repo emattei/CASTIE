@@ -3170,13 +3170,8 @@ unsigned int startt_qcond, endt_qcond;
 
     }
 
-    if(!t_isFastTest){
-            iswriteOutput = true;
-     }else{
-        if(ptr_gSAIGEobj->m_flagSparseGRM_cur){
-            iswriteOutput = true;
-        }
-     }
+    // this pass is final: R never reruns a non-BURDEN region or copies its temp file
+    iswriteOutput = true;
 
   //}//for(unsigned int i_mt = 0; i_mt < t_traitType.size(); i_mt++){
    
