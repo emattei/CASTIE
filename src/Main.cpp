@@ -7403,15 +7403,12 @@ i
 // [[Rcpp::export]]
 void closeGenoFile_plink()
 {
-    if(g_isGRM && !g_isSparseGRM){	
-  //genoToTest_plainDosage.test_genoGZfile.close();
-        for (int i = 0; i < ptr_gNULLGENOobj->numofGenoArray; i++){
-                (*ptr_gNULLGENOobj->genoVecofPointers[i]).clear();
-                delete ptr_gNULLGENOobj->genoVecofPointers[i];
-        }
-
+    if(ptr_gNULLGENOobj){ // the fit and the variance ratios are done: free every genotype buffer
         ptr_gNULLGENOobj->genoVecofPointers.clear();
-
+        ptr_gNULLGENOobj->genoVecofPointers_forVarRatio.clear();
+    }
+    if(g_isGRM && !g_isSparseGRM){
+  //genoToTest_plainDosage.test_genoGZfile.close();
         //ptr_gNULLGENOobj->genoVec.clear();
         ptr_gNULLGENOobj->invstdvVec.clear();
         ptr_gNULLGENOobj->ptrsubSampleInGeno.clear();

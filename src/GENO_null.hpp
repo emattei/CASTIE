@@ -15,6 +15,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <memory>
 #include <cmath>
 #include <ctime>// include this header for calculating execution time
 #include <cassert>
@@ -45,9 +46,9 @@ public:
         int numMarkersofEachArray;
         int numofGenoArray;
         int numMarkersofLastArray;
-        std::vector< std::vector<unsigned char>* > genoVecofPointers;
+        std::vector< std::unique_ptr< std::vector<unsigned char> > > genoVecofPointers;
         ///////////
-        std::vector< std::vector<unsigned char>* > genoVecofPointers_forVarRatio;
+        std::vector< std::unique_ptr< std::vector<unsigned char> > > genoVecofPointers_forVarRatio;
         //arma::fvec g_cateVarRatioMinMACVecExclude;
         //arma::fvec g_cateVarRatioMaxMACVecInclude;
         float g_minMACVarRatio;

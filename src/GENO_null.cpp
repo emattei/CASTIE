@@ -374,7 +374,7 @@ void NullGenoClass::Get_OneSNP_Geno_atBeginning(size_t SNPIdx, vector<int> & ind
                         if(g_maxMACVarRatio != -1){ //if estimating categorical variance ratios
                            if(mac >= g_minMACVarRatio && mac < g_maxMACVarRatio){
                                 passVarRatio = true;
-                                genoVecofPointers_forVarRatio[SNPIdx_vr] = new vector<unsigned char>;
+                                genoVecofPointers_forVarRatio[SNPIdx_vr].reset(new vector<unsigned char>);
                                 genoVecofPointers_forVarRatio[SNPIdx_vr]->reserve(numMarkersofEachArray*ceil(float(Nnomissing)/4));
                            }else if(mac >= g_maxMACVarRatio){
                                    //randomly select 200 markers for estimating the variance ratio for the last MAC category
@@ -387,7 +387,7 @@ void NullGenoClass::Get_OneSNP_Geno_atBeginning(size_t SNPIdx, vector<int> & ind
                                         passVarRatio = arma::any(g_randMarkerIndforVR == static_cast<int>(SNPIdx));
                                         if(passVarRatio){
                                                 //std::cout << "SNPIdx " << SNPIdx << std::endl;
-                                                genoVecofPointers_forVarRatio[SNPIdx_vr] = new vector<unsigned char>;
+                                                genoVecofPointers_forVarRatio[SNPIdx_vr].reset(new vector<unsigned char>);
                                                 genoVecofPointers_forVarRatio[SNPIdx_vr]->reserve(numMarkersofEachArray*ceil(float(Nnomissing)/4));
                                                 numberofMarkers_varRatio_common = numberofMarkers_varRatio_common + 1;
                                                 //passVarRatio = false;
@@ -407,7 +407,7 @@ void NullGenoClass::Get_OneSNP_Geno_atBeginning(size_t SNPIdx, vector<int> & ind
                                         passVarRatio = arma::any(g_randMarkerIndforVR == static_cast<int>(SNPIdx));
                                         if(passVarRatio){
                                                 //std::cout << "SNPIdx " << SNPIdx << std::endl;
-                                                genoVecofPointers_forVarRatio[SNPIdx_vr] = new vector<unsigned char>;
+                                                genoVecofPointers_forVarRatio[SNPIdx_vr].reset(new vector<unsigned char>);
                                                 genoVecofPointers_forVarRatio[SNPIdx_vr]->reserve(numMarkersofEachArray*ceil(float(Nnomissing)/4));
                                                 numberofMarkers_varRatio_common = numberofMarkers_varRatio_common + 1;
                                                 //passVarRatio = false;
@@ -701,7 +701,7 @@ void NullGenoClass::setGenoObj(std::string bedfile, std::string bimfile, std::st
                         genoVecofPointers_forVarRatio.resize(numofGenoArray);
                         //cout << "size of genoVecofPointers: " << genoVecofPointers.size() << endl;
                         for (int i = 0; i < numofGenoArray ; i++){
-                                genoVecofPointers[i] = new vector<unsigned char>;
+                                genoVecofPointers[i].reset(new vector<unsigned char>);
                                 genoVecofPointers[i]->reserve(numMarkersofEachArray*ceil(float(Nnomissing)/4));
                         }
 
@@ -839,10 +839,10 @@ void NullGenoClass::setGenoObj(std::string bedfile, std::string bimfile, std::st
 //              cout << " numofGenoArray "<< numofGenoArray << endl;
 //              cout << " numofGenoArray_old "<< numofGenoArray_old << endl;
 //              cout << " genoVecofPointers.size() "<< genoVecofPointers.size() << endl;
-                if(numofGenoArray > numofGenoArray_old){
+                if(numofGenoArray < numofGenoArray_old){
 
                         for (int i = numofGenoArray; i < numofGenoArray_old ; i++){
-                                delete genoVecofPointers[i];
+                                vector<unsigned char>().swap(*genoVecofPointers[i]); // filtered out: free, but keep the slot so at() still throws
                                 //genoVecofPointers[i] = new vector<unsigned char>;
                                 //genoVecofPointers[i]->reserve(numMarkersofEachArray*ceil(float(Nnomissing)/4));
                         }
