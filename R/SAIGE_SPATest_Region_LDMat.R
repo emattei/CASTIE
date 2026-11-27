@@ -80,6 +80,8 @@ generate_LDMat_forMataRegion <- function(bgenFile = "",
     sampleInModel = sampleInModel
   )
 
+  # Close the marker_info stream if the run fails; a no-op after the close below.
+  on.exit(closeOutfile_single_LDmat(), add = TRUE)
   SAIGE.Region.LDmat(
     OutputFile,
     groupFile,

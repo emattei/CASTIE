@@ -393,6 +393,8 @@ void writeOutfile_single_LDmat(
 // [[Rcpp::export]]
 bool openOutfile_single_LDmat(bool isappend){
       bool isopen;
+      // A stream left open by a failed run would make open() fail; close it first.
+      closeOutfile_single_LDmat();
       if(!isappend){
         OutFile_single_LDmat.open(g_outputFilePrefixSingle_LDmat.c_str());
 	isopen = OutFile_single_LDmat.is_open();
@@ -409,5 +411,7 @@ bool openOutfile_single_LDmat(bool isappend){
 
 // [[Rcpp::export]]
 void closeOutfile_single_LDmat(){
-  OutFile_single_LDmat.close();
-}  
+  if(OutFile_single_LDmat.is_open()){
+    OutFile_single_LDmat.close();
+  }
+}
