@@ -581,6 +581,7 @@ publishOutputFiles <- function(from, to) {
 
 publishStagedOutputFiles <- function(OutputPrefix) {
   staged <- stagedOutputFiles(OutputPrefix)
+  staged <- staged[!endsWith(staged, ".bin")] # chunk matrices left by a killed region call are not results
   staged <- staged[order(endsWith(staged, ".index"))] # the index last: a published index marks the run finished
   publishOutputFiles(staged, publishedOutputFile(staged, OutputPrefix))
 }
