@@ -16,17 +16,21 @@
 double CCT_cpp(arma::vec & pval){
     double cauchyp, cctstat;
     uint np = pval.n_elem;    
+    // no p-values to combine: missing, not a result
+    if(np == 0){
+        return NA_REAL;
+    }
     //check if there is NA	
     bool isna = pval.has_nan();
     if(isna){
-        std::cout << "Cannot have NAs in the p-values!" << std::endl;
+        Rcpp::stop("Cannot have NAs in the p-values!");
     }
 
     // check if all p-values are between 0 and 1
 
     arma::uvec between0and1Indice = arma::find(pval <= 1 && pval >= 0);
     if (between0and1Indice.n_elem != np){
-        exit(EXIT_FAILURE); 
+        Rcpp::stop("All p-values must be between 0 and 1!");
     }
 
     bool isnonzero = arma::all(pval);
