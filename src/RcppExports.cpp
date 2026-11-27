@@ -537,6 +537,15 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// close_region_outfiles
+void close_region_outfiles();
+RcppExport SEXP _CASTIE_close_region_outfiles() {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    close_region_outfiles();
+    return R_NilValue;
+END_RCPP
+}
 // set_flagSparseGRM_cur_SAIGE
 void set_flagSparseGRM_cur_SAIGE(bool t_flagSparseGRM_cur);
 RcppExport SEXP _CASTIE_set_flagSparseGRM_cur_SAIGE(SEXP t_flagSparseGRM_curSEXP) {
@@ -2703,6 +2712,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CASTIE_removeOutfile_inSingle", (DL_FUNC) &_CASTIE_removeOutfile_inSingle, 0},
     {"_CASTIE_openOutfile_single", (DL_FUNC) &_CASTIE_openOutfile_single, 5},
     {"_CASTIE_closeOutfile_single", (DL_FUNC) &_CASTIE_closeOutfile_single, 0},
+    {"_CASTIE_close_region_outfiles", (DL_FUNC) &_CASTIE_close_region_outfiles, 0},
     {"_CASTIE_set_flagSparseGRM_cur_SAIGE", (DL_FUNC) &_CASTIE_set_flagSparseGRM_cur_SAIGE, 1},
     {"_CASTIE_set_flagSparseGRM_cur_SAIGE_org", (DL_FUNC) &_CASTIE_set_flagSparseGRM_cur_SAIGE_org, 0},
     {"_CASTIE_copy_singleInGroup", (DL_FUNC) &_CASTIE_copy_singleInGroup, 0},
