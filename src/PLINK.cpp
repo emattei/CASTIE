@@ -203,26 +203,10 @@ void PlinkClass::getOneMarker(uint64_t & t_gIndex_prev,
       Rcpp::stop("Check PlinkClass::getOneMarker, if t_isTrueGenotype = FALSE, then t_isOnlyOutputNonZero should be FALSE.");
   }
  
-  uint64_t posSeek;
- if(t_gIndex > 0){
-    if(t_gIndex_prev == 0){ //if it is the first element
-	  posSeek = 3 + m_numBytesofEachMarker0 * t_gIndex;
-	  fseek(m_fin, posSeek, SEEK_SET);
-	  //m_ibedFile.seekg(posSeek, ios_base::beg);
-     }else{
-	  posSeek = m_numBytesofEachMarker0 * (t_gIndex-t_gIndex_prev-1);
-	  if(posSeek > 0){
-		//m_ibedFile.seekg(posSeek, ios_base::cur);
-	  	fseek(m_fin, posSeek, SEEK_CUR);
-	  }
-   }
-  }
-  /*
+  // Absolute seek: t_gIndex_prev is not always the marker read last (marker 0, decreasing indices)
   uint64_t posSeek = 3 + m_numBytesofEachMarker0 * t_gIndex;
-  if(t_gIndex > 0){
-          fseek(m_fin, posSeek, SEEK_SET);
-  }
-  */
+  if(fseeko(m_fin, posSeek, SEEK_SET) != 0)
+    Rcpp::stop("Cannot seek to marker %d in plink bed file %s.", t_gIndex + 1, m_bedFile);
   //m_ibedFile.seekg(posSeek);
   //m_ibedFile.read((char*)(&m_OneMarkerG4[0]), m_numBytesofEachMarker0);
   if(fread((char*)(&m_OneMarkerG4[0]), 1, m_numBytesofEachMarker0 , m_fin) != m_numBytesofEachMarker0)
