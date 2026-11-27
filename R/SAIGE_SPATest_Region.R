@@ -143,6 +143,16 @@ SAIGE.Region <- function(mu,
     isappend <- TRUE
   }
 
+  # Remove any streams left by an earlier region test in this R session.
+  close_region_outfiles()
+  streams_open <- TRUE
+  on.exit(
+    {
+      if (streams_open) close_region_outfiles()
+    },
+    add = TRUE
+  )
+
   n <- length(mu) # sample size
 
 
@@ -1304,6 +1314,9 @@ SAIGE.Region <- function(mu,
       pval.Region <- NULL
     }
   }
+
+  close_region_outfiles()
+  streams_open <- FALSE
 
   message <- paste0(
     "Analysis done! The results have been saved to '", OutputFile, "' and '",

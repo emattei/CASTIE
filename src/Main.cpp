@@ -3891,6 +3891,21 @@ void closeOutfile_single(){
 }
 
 
+// [[Rcpp::export]]
+void close_region_outfiles(){
+     // Region streams, closed and cleared like closeOutfile_single so a later SAIGE.Region opens its own.
+     for(std::vector<std::ofstream> * streams : {&OutFile_vec, &OutFile_singleInGroup_vec, &OutFile_singleInGroup_temp_vec}){
+          for(std::ofstream & stream : *streams){
+               if(stream.is_open()){
+                    stream.flush();
+                    stream.close();
+               }
+          }
+          streams->clear();
+     }
+}
+
+
 void writeOutfile_single(bool t_isMoreOutput,
 			bool t_isImputation,
 			bool t_isCondition,

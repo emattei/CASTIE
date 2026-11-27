@@ -141,6 +141,10 @@ closeOutfile_single <- function() {
     invisible(.Call('_CASTIE_closeOutfile_single', PACKAGE = 'CASTIE'))
 }
 
+close_region_outfiles <- function() {
+    invisible(.Call('_CASTIE_close_region_outfiles', PACKAGE = 'CASTIE'))
+}
+
 set_flagSparseGRM_cur_SAIGE <- function(t_flagSparseGRM_cur) {
     invisible(.Call('_CASTIE_set_flagSparseGRM_cur_SAIGE', PACKAGE = 'CASTIE', t_flagSparseGRM_cur))
 }
